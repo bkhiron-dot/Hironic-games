@@ -29,6 +29,7 @@ const LOVES = [
   ["space", "🚀 Space"], ["animals", "🐾 Animals"], ["dinosaurs", "🦖 Dinosaurs"], ["football", "⚽ Football"],
   ["cars", "🏎️ Cars"], ["building", "🧱 Building"], ["ocean", "🌊 Ocean"], ["robots", "🤖 Robots"],
   ["magic", "🧙 Magic"], ["ninjas", "🥷 Ninjas"], ["food", "🍕 Food"], ["music", "🎵 Music"],
+  ["bikes", "🚲 Bike riding"], ["surfing", "🏄 Surfing"], ["skateboarding", "🛹 Skateboarding"],
 ];
 const GAME_TYPES = [
   ["catching", "🧺 Catching"], ["dodging", "☄️ Dodging"], ["racing", "🏁 Racing"], ["puzzles", "🧩 Puzzles"],
@@ -200,7 +201,7 @@ async function homeScreen(me) {
 async function profileScreen(existing) {
   const state = existing
     ? structuredClone(existing)
-    : { name: "", age: 7, icon: PROFILE_ICONS[0], colour: COLOURS[5], about: { loves: [], gameTypes: [], playStyle: "both", dream: "" } };
+    : { name: "", age: 7, icon: PROFILE_ICONS[0], colour: COLOURS[5], about: { loves: [], gameTypes: [], playStyle: "both", dream: "", lovesOther: "" } };
   const about = state.about;
 
   app.innerHTML = `${existing ? header(existing, "me") : ""}
@@ -227,6 +228,9 @@ async function profileScreen(existing) {
       <section class="card" id="about">
         <h2>What do you love? <small>(pick lots!)</small></h2>
         ${choices("loves", LOVES, about.loves, { multi: true })}
+        <label class="other">Anything else you love?
+          <input name="lovesOther" maxlength="100" value="${esc(about.lovesOther)}" placeholder="e.g. fishing, Lego, drawing" autocomplete="off">
+        </label>
         <h2>What games do you like?</h2>
         ${choices("gameTypes", GAME_TYPES, about.gameTypes, { multi: true })}
         <h2>How do you like to play?</h2>
@@ -251,6 +255,7 @@ async function profileScreen(existing) {
     state.name = data.get("name").trim();
     state.age = Number(data.get("age")) || null;
     about.dream = data.get("dream").trim();
+    about.lovesOther = data.get("lovesOther").trim();
     if (!state.name) return;
     const saved = await saveProfile(state);
     setCurrentProfileId(saved.id);
@@ -590,7 +595,7 @@ function newGamePrompt(b, me) {
 NEW GAME request from the Hironic Games dashboard.
 
 Player: ${me.name} ${me.icon} (age ${me.age ?? "?"})${b.helper ? `, building with ${b.helper}` : ""}. They are here with you – build it together.
-Loves: ${labelFor(LOVES, about.loves ?? [])}
+Loves: ${labelFor(LOVES, [...(about.loves ?? []), ...(about.lovesOther ? [about.lovesOther] : [])])}
 Likes playing: ${labelFor(GAME_TYPES, about.gameTypes ?? [])}
 
 GAME BRIEF
