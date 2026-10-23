@@ -14,14 +14,14 @@ function readDb() {
     const raw = localStorage.getItem(DB_KEY);
     if (raw) return JSON.parse(raw);
   } catch {}
-  return { profiles: [], games: [], scores: [], plays: {} };
+  return { profiles: [], games: [], scores: [], plays: {}, briefs: [], codeStatus: {} };
 }
 
 function writeDb(db) {
   try {
     localStorage.setItem(DB_KEY, JSON.stringify(db));
   } catch {
-    alert("Couldn't save – this browser may be blocking storage.");
+    console.warn("Couldn't save – this browser may be blocking storage.");
   }
 }
 
@@ -68,25 +68,39 @@ export function setCurrentProfileId(id) {
 // status "draft" games are only seen by their author (Create/Test);
 // status "published" games appear in everyone's Play library.
 
-function codeGames() {
-  return CODE_GAMES.map((g) => ({
-    id: `code:${g.slug}`,
-    kind: "code",
-    status: "published",
-    title: g.title,
-    icon: g.emoji,
-    description: g.description,
-    authorName: g.author,
-    authorIcon: g.authorIcon,
-    url: `games/${g.slug}/`,
-  }));
+// Code games name their author in games.js (e.g. author: "Sam"); we link
+// that to the profile with the same name so credits and editing work.
+function codeGames(db) {
+  const byName = new Map(db.profiles.map((p) => [p.name.trim().toLowerCase(), p]));
+  return CODE_GAMES.map((g) => {
+    const id = `code:${g.slug}`;
+    const author = byName.get(String(g.author).trim().toLowerCase());
+    return {
+      id,
+      kind: "code",
+      slug: g.slug,
+      status: db.codeStatus?.[id] ?? g.status ?? "published",
+      title: g.title,
+      icon: g.emoji,
+      description: g.description,
+      authorId: author?.id ?? null,
+      authorName: g.author,
+      authorIcon: g.authorIcon ?? "🛠️",
+      briefId: g.briefId ?? null,
+      url: `games/${g.slug}/`,
+    };
+  });
 }
 
 export async function listGames() {
   const db = readDb();
   const maker = db.games.map((g) => ({ status: "draft", ...g, kind: "maker", url: `play.html?game=${g.id}` }));
-  return [...maker.sort((a, b) => b.updatedAt - a.updatedAt), ...codeGames()];
+  return [...maker.sort((a, b) => b.updatedAt - a.updatedAt), ...codeGames(db)];
 }
+
+/** Link to try a game without recording plays or scores. */
+export const testUrl = (game) => `${game.url}${game.url.includes("?") ? "&" : "?"}test=1`;
+export const isTestMode = () => new URLSearchParams(location.search).has("test");
 
 export async function getGame(id) {
   return (await listGames()).find((g) => g.id === id) ?? null;
@@ -95,6 +109,12 @@ export async function getGame(id) {
 /** game: { title, icon, template, settings, authorId, status } */
 export async function saveGame(game) {
   const db = readDb();
+  // Code games live in the repo; only their draft/published status is stored here.
+  if (game.id?.startsWith("code:")) {
+    db.codeStatus = { ...db.codeStatus, [game.id]: game.status };
+    writeDb(db);
+    return game;
+  }
   const now = Date.now();
   if (game.id) {
     db.games = db.games.map((g) => (g.id === game.id ? { ...g, ...game, updatedAt: now } : g));
@@ -116,13 +136,16 @@ export async function deleteGame(id) {
 
 // ---------- Plays & scores ----------
 
+// Test mode (?test=1) never records anything, for every kind of game.
 export async function recordPlay(gameId) {
+  if (isTestMode()) return;
   const db = readDb();
   db.plays[gameId] = (db.plays[gameId] ?? 0) + 1;
   writeDb(db);
 }
 
 export async function recordScore(gameId, profileId, score) {
+  if (isTestMode()) return;
   const db = readDb();
   db.scores.push({ gameId, profileId: profileId ?? null, score, at: Date.now() });
   writeDb(db);
@@ -149,4 +172,36 @@ export async function getLeaderboard(gameId) {
   return [...best]
     .map(([profileId, score]) => ({ score, profile: db.profiles.find((p) => p.id === profileId) ?? null }))
     .sort((a, b) => b.score - a.score);
+}
+
+// ---------- Claude Code briefs ----------
+// A brief is a player's description of a game they want to build with Claude Code.
+// brief: { authorId, title, type, hero, heroIcon, goal, challenge, controls[], look[], sounds[], extra }
+
+export async function listBriefs(authorId) {
+  return (readDb().briefs ?? []).filter((b) => b.authorId === authorId).sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export async function getBrief(id) {
+  return (readDb().briefs ?? []).find((b) => b.id === id) ?? null;
+}
+
+export async function saveBrief(brief) {
+  const db = readDb();
+  db.briefs ??= [];
+  const now = Date.now();
+  if (brief.id) {
+    db.briefs = db.briefs.map((b) => (b.id === brief.id ? { ...b, ...brief, updatedAt: now } : b));
+  } else {
+    brief = { ...brief, id: newId(), createdAt: now, updatedAt: now };
+    db.briefs.push(brief);
+  }
+  writeDb(db);
+  return brief;
+}
+
+export async function deleteBrief(id) {
+  const db = readDb();
+  db.briefs = (db.briefs ?? []).filter((b) => b.id !== id);
+  writeDb(db);
 }

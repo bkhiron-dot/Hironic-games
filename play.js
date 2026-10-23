@@ -10,7 +10,7 @@ const testing = params.has("test");
 
 const game = await getGame(params.get("game"));
 const back = document.getElementById("back");
-back.href = testing ? "./#/test" : `./#/game/${encodeURIComponent(params.get("game"))}`;
+back.href = testing ? "index.html#/test" : `index.html#/game/${encodeURIComponent(params.get("game"))}`;
 if (testing) back.textContent = "← Back to Test";
 
 const view = createCanvas();
@@ -33,13 +33,13 @@ function update(dt) {
   } else if (tapped) {
     round = template.newRound(settings, view);
     state = "playing";
-    if (!testing) recordPlay(game.id);
+    recordPlay(game.id); // ignored in test mode
   }
 }
 
 function finish() {
   state = "over";
-  if (!testing) recordScore(game.id, playerId, round.player.score);
+  recordScore(game.id, playerId, round.player.score); // ignored in test mode
 }
 
 function draw() {
