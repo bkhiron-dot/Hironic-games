@@ -1,11 +1,14 @@
 // Star Catcher – the sample game and starting template.
 // Move the basket with arrow keys, mouse or finger. Miss 3 stars and it's over.
 import {
-  createCanvas, startLoop, createInput, beep, save, load,
+  createCanvas, startLoop, createInput, beep,
   clamp, random, overlaps, drawText,
 } from "../../shared/engine.js";
+import { getCurrentProfileId, getLeaderboard, recordPlay, recordScore } from "../../shared/store.js";
 
-const GAME_ID = "star-catcher";
+// Code games use "code:<folder name>" as their id in the library.
+const GAME_ID = "code:star-catcher";
+const playerId = getCurrentProfileId();
 const view = createCanvas();
 const input = createInput(view.canvas);
 const { ctx } = view;
@@ -13,7 +16,8 @@ const { ctx } = view;
 // "title" -> "playing" -> "over" -> "playing" ...
 let state = "title";
 let basket, stars, score, lives, spawnTimer;
-let best = load(GAME_ID, "best", 0);
+// This player's best score so far.
+let best = (await getLeaderboard(GAME_ID)).find((r) => r.profile?.id === playerId)?.score ?? 0;
 
 function reset() {
   basket = { x: view.width / 2 - 50, y: view.height - 70, w: 100, h: 30, speed: 600 };
@@ -30,6 +34,7 @@ function update(dt) {
     if (tapped) {
       reset();
       state = "playing";
+      recordPlay(GAME_ID);
     }
     return;
   }
@@ -64,10 +69,8 @@ function update(dt) {
 
   if (lives <= 0) {
     state = "over";
-    if (score > best) {
-      best = score;
-      save(GAME_ID, "best", best);
-    }
+    best = Math.max(best, score);
+    recordScore(GAME_ID, playerId, score);
   }
 }
 
