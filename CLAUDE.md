@@ -24,8 +24,8 @@ studio.js               🔑 Studio for the Creator: approve, copy for Claude, t
 shared/questions.js     Starter question bank (plain data – edit freely) and interest lists
 shared/ai.js            Live AI follow-up questions (claude.ai test page now; family backend in Phase 2)
 play.html, play.js      Runs Game Maker games (?game=<id>, add &test=1 for test mode)
-shared/store.js         ALL data access (profiles, games, scores). localStorage in Phase 1;
-                        swapped for the online backend in Phase 2 with the same async API
+shared/store.js         ALL data access. Test dashboard: the page database (+ localStorage backup);
+                        elsewhere localStorage. Phase 2 swaps in the family backend, same async API
 shared/engine.js        Canvas, game loop, input, sound helpers
 shared/style.css        Common look and feel
 templates/              Game Maker templates (catcher.js, dodger.js) + common.js helpers
@@ -40,6 +40,12 @@ games/<slug>/           One folder per hand-coded game
 3. **Build:** Claude adds `games/<slug>/` and registers it in `games.js` with the player's name, `briefId` and `status: "draft"`.
 4. **Test & improve:** the author tests it, then uses 🔧 Improve to send a feedback round; the Creator approves it and Claude makes the changes. Repeat as needed.
 5. **Publish:** the author publishes it from Test, and it appears in everyone's Play library.
+
+## Test dashboard (Phase 1)
+- Published at https://claude.ai/artifact/7BRz27uRjUaCKPX8Hvsb7a (private to the Creator's claude.ai account). Capabilities: `sample` (live AI questions) and `db` (saving).
+- Its database holds one document per data set at `hironic/<key>` (`profiles`, `games`, `scores`, `plays`, `briefs`, `feedback`, `codeStatus`), each `{ value }`. Claude Code may read these with `ArtifactData`, e.g. to see approved designs.
+- `hironic/builds` = `{ items: { "<status id>": { stage, note, steps, game, updatedAt } } }` is written only by Claude Code (see the `/build-game` skill) and shown as live build progress.
+- New coded games become playable there when the artifact is republished with their files.
 
 ## Game lifecycle (Game Maker)
 - **Create:** made in the Game Maker (template + settings) and saved as `status: "draft"`. Only the author sees drafts.

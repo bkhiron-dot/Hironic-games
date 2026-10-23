@@ -20,6 +20,13 @@ The message comes from the dashboard. A player (aged 7, 10 or 12) designed the g
 - Ask **2–4 quick questions** about whatever the brief leaves unclear (e.g. "Should the shark get bigger when it eats?"). Offer choices (A/B/C) rather than open questions.
 - Play back the plan in **3–5 bullets** and wait for a "yes" before writing code. Keep version 1 small; save extra ideas for "next time" and list them at the end.
 
+## 1c. Report progress to the dashboard
+The request ends with `Build status id: brief:<id>` or `feedback:<id>`. Post progress so the player and the Creator can follow along in the dashboard: the design page and the 🔑 Studio show it live.
+- Write it to the test dashboard's database: artifact `https://claude.ai/artifact/7BRz27uRjUaCKPX8Hvsb7a`, document `hironic/builds`, with the `ArtifactData` tool (load it with ToolSearch). Read the document first. If it doesn't exist, `set` it to `{ "items": { "<status id>": {...} } }`; otherwise `update` with `{ "items": { "<status id>": {...} } }`. Update merges, so other builds are kept.
+- Each entry: `{ "stage": "...", "note": "<one short kid-friendly sentence>", "steps": [{ "label": "...", "done": true|false }], "game": "<slug>", "updatedAt": "<ISO time>" }`.
+- Stages, in order: `building` (when you start; list 3–5 steps from the plan), `testing` (when running the smoke test), `ready` (committed and pushed), `live` (playable in the test dashboard, see step 4). Use `blocked` with a note if you need the Creator.
+- Update at each stage change, not after every edit. If the status id is missing, or ArtifactData isn't available in this session, skip this and say so.
+
 ## 2. Build (new game)
 - Pick a short kebab-case slug from the name; check `games.js` and `games/` so it doesn't clash.
 - Copy `games/star-catcher/` to `games/<slug>/` and rewrite `game.js`. Keep both `<script>` tags in `index.html` (`shared/game-page.js` handles test mode and the back button).
@@ -44,7 +51,8 @@ The message comes from the dashboard. A player (aged 7, 10 or 12) designed the g
 - Keep test scripts in the scratchpad, not the repo.
 
 ## 4. Finish
-- Commit with a message like `Add Shark Splash by Sam` (or `Shark Splash: round 2 – golden fish (Sam)`), then push.
+- Commit with a message like `Add Shark Splash by Sam` (or `Shark Splash: round 2 – golden fish (Sam)`), then push. Set the build stage to `ready`.
+- Make it playable in the test dashboard: read the artifact (`Artifact` action `read` with its URL), then republish it with `url` set and `files` containing the updated `games.js` and every file in `games/<slug>/`, plus any shared files you changed. Then set the build stage to `live`.
 - Tell the player and the Creator, in the player's language:
   - once it's merged to the main branch and the site updates, it appears in **🧪 Test**, where they can try it and press **🚀 Publish**;
   - the "Things to try changing" values they could experiment with;

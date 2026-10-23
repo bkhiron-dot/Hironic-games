@@ -521,4 +521,9 @@ async function makeScreen(me, id) {
 }
 
 window.addEventListener("hashchange", route);
+// New data from another device, or build progress from Claude Code: refresh the
+// screen, unless the player is in the middle of a form or the designer.
+window.addEventListener("hironic:changed", () => {
+  if (!document.querySelector("form, .wizard")) route();
+});
 route();

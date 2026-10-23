@@ -5,11 +5,11 @@
 // The player sends the plan to the Creator, who approves it in the Studio and
 // passes the build request to Claude Code.
 import {
-  getBrief, saveBrief, getGame, getFeedback, saveFeedback, listFeedback, listProfiles, listGames, testUrl,
+  getBrief, saveBrief, getGame, saveFeedback, listFeedback, listProfiles, listGames, testUrl, getBuild,
 } from "./shared/store.js";
 import { aiFollowUps } from "./shared/ai.js";
 import { GAME_KINDS, LOVES, starterQuestionsFor, REFINE_QUESTIONS } from "./shared/questions.js";
-import { esc, go, header, choices, bindChoices, labelFor, isCreator } from "./ui.js";
+import { esc, go, header, choices, bindChoices, labelFor, isCreator, buildTracker } from "./ui.js";
 
 const app = document.getElementById("app");
 
@@ -201,10 +201,12 @@ async function creatorName() {
 /** Where a sent design is up to. */
 async function briefStatusScreen(me, brief) {
   const built = (await listGames()).find((g) => g.briefId === brief.id);
+  const build = await getBuild(`brief:${brief.id}`);
   const who = await creatorName();
   const status = built
     ? `✅ Built! <a href="${testUrl(built)}">Test it now</a>`
-    : brief.status === "approved" ? `🔨 ${esc(who)} has sent it to Claude to build.`
+    : build ? "🔨 Claude is working on it!"
+    : brief.status === "approved" ? `🔑 ${esc(who)} has sent it to Claude to build.`
     : `⏳ Waiting for ${esc(who)} to check it.`;
   app.innerHTML = `${header(me, "create")}
   <main class="form-page">
@@ -212,6 +214,7 @@ async function briefStatusScreen(me, brief) {
       <span class="emoji huge">${built ? "🎉" : "📨"}</span>
       <h1>${esc(brief.title)}</h1>
       <p class="status-line">${status}</p>
+      ${buildTracker(brief, build, built)}
       <p class="hint">When it's built, it shows up in 🧪 Test. Only you (and ${esc(who)}) can see it until you publish it.</p>
     </section>
     <section class="card"><h2>📋 Your plan</h2>
@@ -286,7 +289,8 @@ Game: "${brief.title}" – ${labelFor(GAME_KINDS, [brief.kind])}
 DESIGN ANSWERS
 ${answerList(brief.answers)}
 
-Credit: author "${player.name}", authorIcon "${player.icon}", briefId "${brief.id}"`;
+Credit: author "${player.name}", authorIcon "${player.icon}", briefId "${brief.id}"
+Build status id: brief:${brief.id}`;
 }
 
 export function changeRequest(fb, game, player, creator) {
@@ -300,5 +304,7 @@ Player: ${player.name} ${player.icon} (age ${player.age ?? "?"})
 Game: "${game.title}" in games/${game.slug}/
 
 FEEDBACK
-${answerList(fb.answers)}`;
+${answerList(fb.answers)}
+
+Build status id: feedback:${fb.id}`;
 }

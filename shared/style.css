@@ -237,3 +237,18 @@ textarea.prompt { font-family: ui-monospace, Menlo, Consolas, monospace; font-si
 .pill { padding: 4px 10px; border-radius: 999px; font-size: 0.9rem; font-weight: bold; background: var(--bg); }
 .pill.ready { background: var(--accent); color: #1b1f3b; }
 .pill.approved { background: #7dd3fc; color: #1b1f3b; }
+
+/* ---------- Saving and build progress ---------- */
+.save-status { font-size: 0.9rem; opacity: 0.85; white-space: nowrap; }
+.save-status.error { color: #fca5a5; opacity: 1; }
+.save-status.device { opacity: 0.6; }
+@media (max-width: 420px) { .save-status .label { display: none; } }
+.tracker { text-align: left; margin: 12px 0; }
+.stages { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.stages li { padding: 6px 10px; border-radius: 999px; background: var(--bg); opacity: 0.55; font-size: 0.95rem; }
+.stages li.done { opacity: 1; background: #3a4180; }
+.stages li.now { opacity: 1; background: var(--accent); color: #1b1f3b; font-weight: bold; }
+.build-note { font-size: 1.05rem; }
+.build-steps { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 4px; }
+.build-steps li { opacity: 0.7; }
+.build-steps li.done { opacity: 1; }

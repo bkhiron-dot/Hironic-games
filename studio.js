@@ -2,10 +2,10 @@
 // Approve game designs and improvement requests, send them to Claude Code,
 // and test any draft.
 import {
-  listBriefs, saveBrief, listFeedback, saveFeedback, listProfiles, listGames, getGame, testUrl,
+  listBriefs, saveBrief, listFeedback, saveFeedback, listProfiles, listGames, getGame, testUrl, getBuild,
 } from "./shared/store.js";
 import { newGameRequest, changeRequest } from "./designer.js";
-import { esc, go, header, avatar, copyText, isCreator } from "./ui.js";
+import { esc, go, header, avatar, copyText, isCreator, buildTracker } from "./ui.js";
 
 const app = document.getElementById("app");
 
@@ -26,13 +26,14 @@ export async function studioScreen(me) {
   const feedback = await listFeedback();
 
   // One request card: who, what, their answers, the text for Claude, and actions.
-  const card = ({ kind, id, player, title, icon, answers, request, status }) => `
+  const card = ({ kind, id, player, title, icon, answers, request, status, record, build }) => `
     <article class="card request" data-kind="${kind}" data-id="${id}">
       <header class="request-head">
         <span class="emoji">${esc(icon)}</span>
         <div><h3>${esc(title)}</h3><p class="by">${avatar(player, "tiny")} ${esc(player?.name ?? "Unknown")}</p></div>
         <span class="pill ${status}">${{ ready: "📥 Needs you", approved: "🔨 Sent to Claude", designing: "✏️ Player is working on it" }[status] ?? status}</span>
       </header>
+      ${status === "approved" ? buildTracker(record, build, null) : ""}
       <ul class="plan">${answers.filter((a) => a.text).map((a) =>
         `<li><span class="q">${a.fromClaude ? "🤖 " : ""}${esc(a.ask)}</span><b>${esc(a.text)}</b></li>`).join("")}</ul>
       <details><summary>Request for Claude Code</summary><textarea class="prompt" rows="12" readonly>${esc(request)}</textarea></details>
@@ -44,15 +45,16 @@ export async function studioScreen(me) {
       </div>
     </article>`;
 
-  const briefCards = briefs.filter((b) => b.status !== "designing" || b.creatorNote).map((b) => card({
+  const briefCards = await Promise.all(briefs.filter((b) => b.status !== "designing" || b.creatorNote).map(async (b) => card({
     kind: "brief", id: b.id, player: profiles.get(b.authorId), title: b.title, icon: "🤖",
     answers: b.answers, status: b.status, request: newGameRequest(b, profiles.get(b.authorId) ?? {}, me),
-  }));
+    record: b, build: await getBuild(`brief:${b.id}`),
+  })));
   const feedbackCards = await Promise.all(feedback.filter((f) => ["ready", "approved"].includes(f.status)).map(async (f) => {
     const game = await getGame(f.gameId);
     return card({
       kind: "feedback", id: f.id, player: profiles.get(f.authorId), title: `${game?.title ?? "Game"} – round ${f.round}`,
-      icon: game?.icon ?? "🔧", answers: f.answers, status: f.status,
+      icon: game?.icon ?? "🔧", answers: f.answers, status: f.status, record: f, build: await getBuild(`feedback:${f.id}`),
       request: game ? changeRequest(f, game, profiles.get(f.authorId) ?? {}, me) : "",
     });
   }));
