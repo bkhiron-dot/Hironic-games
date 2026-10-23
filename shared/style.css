@@ -1,0 +1,70 @@
+:root {
+  --bg: #1b1f3b;
+  --panel: #2b3160;
+  --text: #f5f7ff;
+  --accent: #ffcc33;
+  --font: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+}
+
+/* ---------- Arcade launcher ---------- */
+.arcade header { text-align: center; padding: 24px 16px 8px; }
+.arcade h1 { margin: 0; font-size: clamp(2rem, 6vw, 3.5rem); }
+.arcade header p { font-size: 1.3rem; margin: 8px 0 0; }
+
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  padding: 16px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.game-card {
+  display: block;
+  background: var(--panel);
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 16px;
+  padding: 20px;
+  border: 3px solid transparent;
+  transition: transform 0.1s, border-color 0.1s;
+}
+.game-card:hover, .game-card:focus-visible { transform: scale(1.03); border-color: var(--accent); }
+.game-card .emoji { font-size: 3rem; }
+.game-card h2 { margin: 8px 0; }
+.game-card small { color: var(--accent); font-size: 1rem; }
+
+/* ---------- In-game pages ---------- */
+body.game {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  touch-action: none; /* stop the page scrolling while playing on a tablet */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body.game canvas { display: block; width: 100%; height: 100%; }
+
+.back-button {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  background: var(--panel);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 1.2rem;
+  padding: 10px 16px;
+  border-radius: 12px;
+}

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hironic Games</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+  <link rel="stylesheet" href="shared/style.css">
+</head>
+<body class="arcade">
+  <header>
+    <h1>🎮 Hironic Games</h1>
+    <p>Pick a game!</p>
+  </header>
+  <main id="game-list" class="game-grid"></main>
+
+  <script type="module">
+    import { GAMES } from "./games.js";
+    import { load } from "./shared/engine.js";
+
+    const list = document.getElementById("game-list");
+    for (const game of GAMES) {
+      const best = load(game.slug, "best", null);
+      const card = document.createElement("a");
+      card.className = "game-card";
+      card.href = `games/${game.slug}/`;
+      card.innerHTML = `
+        <span class="emoji">${game.emoji}</span>
+        <h2>${game.title}</h2>
+        <p>${game.description}</p>
+        <small>Ages ${game.ages}${best !== null ? ` · Best: ${best}` : ""}</small>`;
+      list.append(card);
+    }
+  </script>
+</body>
+</html>
