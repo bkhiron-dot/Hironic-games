@@ -14,7 +14,7 @@ function readDb() {
     const raw = localStorage.getItem(DB_KEY);
     if (raw) return JSON.parse(raw);
   } catch {}
-  return { profiles: [], games: [], scores: [], plays: {}, briefs: [], codeStatus: {} };
+  return { profiles: [], games: [], scores: [], plays: {}, briefs: [], feedback: [], codeStatus: {} };
 }
 
 function writeDb(db) {
@@ -37,7 +37,10 @@ export async function getProfile(id) {
   return readDb().profiles.find((p) => p.id === id) ?? null;
 }
 
-/** profile: { name, age, icon, colour, about: { loves[], gameTypes[], playStyle, dream } } */
+/**
+ * profile: { name, age, icon, colour, role, about: { loves[], lovesOther, gameTypes[], playStyle, dream } }
+ * role is "player" (default) or "creator" (the supervising grown-up, who has a passcodeHash).
+ */
 export async function saveProfile(profile) {
   const db = readDb();
   if (profile.id) {
@@ -48,6 +51,20 @@ export async function saveProfile(profile) {
   }
   writeDb(db);
   return profile;
+}
+
+// The Creator passcode is stored only as a SHA-256 hash.
+// Phase 1 note: this keeps the boys out of the Creator screens, but it is not
+// real security – anyone with browser dev tools could get round it. In Phase 2
+// the Creator role is checked by the server.
+export async function hashPasscode(code) {
+  const bytes = new TextEncoder().encode(`hironic:${code}`);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function checkPasscode(profile, code) {
+  return Boolean(profile?.passcodeHash) && profile.passcodeHash === (await hashPasscode(code));
 }
 
 // Who is playing on this device. Always local, even after Phase 2.
@@ -174,12 +191,19 @@ export async function getLeaderboard(gameId) {
     .sort((a, b) => b.score - a.score);
 }
 
-// ---------- Claude Code briefs ----------
-// A brief is a player's description of a game they want to build with Claude Code.
-// brief: { authorId, title, type, hero, heroIcon, goal, challenge, controls[], look[], sounds[], extra }
+// ---------- Game Designer briefs ----------
+// A brief is a player's design for a game to be built with Claude Code.
+// brief: { authorId, title, kind, answers: [{ id, ask, picked[], own, text, fromClaude }],
+//          step, status, creatorNote }
+// status: "designing" (player still answering) → "ready" (sent to the Creator)
+//         → "approved" (Creator sent it to Claude Code). A game in games.js with
+//         the same briefId means it has been built.
 
-export async function listBriefs(authorId) {
-  return (readDb().briefs ?? []).filter((b) => b.authorId === authorId).sort((a, b) => b.updatedAt - a.updatedAt);
+/** All briefs, or just one player's. Newest first. */
+export async function listBriefs(authorId = null) {
+  return (readDb().briefs ?? [])
+    .filter((b) => !authorId || b.authorId === authorId)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function getBrief(id) {
@@ -204,4 +228,35 @@ export async function deleteBrief(id) {
   const db = readDb();
   db.briefs = (db.briefs ?? []).filter((b) => b.id !== id);
   writeDb(db);
+}
+
+// ---------- Feedback rounds ("Improve my game") ----------
+// After testing their own coded game, a player answers a few questions; the
+// Creator turns approved feedback into a change request for Claude Code.
+// feedback: { gameId, authorId, round, answers: [...as in briefs], step, status }
+// status: "designing" → "ready" (sent to the Creator) → "approved" → "done"
+
+export async function listFeedback({ gameId = null, authorId = null } = {}) {
+  return (readDb().feedback ?? [])
+    .filter((f) => (!gameId || f.gameId === gameId) && (!authorId || f.authorId === authorId))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export async function getFeedback(id) {
+  return (readDb().feedback ?? []).find((f) => f.id === id) ?? null;
+}
+
+export async function saveFeedback(feedback) {
+  const db = readDb();
+  db.feedback ??= [];
+  const now = Date.now();
+  if (feedback.id) {
+    db.feedback = db.feedback.map((f) => (f.id === feedback.id ? { ...f, ...feedback, updatedAt: now } : f));
+  } else {
+    const round = db.feedback.filter((f) => f.gameId === feedback.gameId).length + 1;
+    feedback = { round, ...feedback, id: newId(), createdAt: now, updatedAt: now };
+    db.feedback.push(feedback);
+  }
+  writeDb(db);
+  return feedback;
 }

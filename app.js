@@ -1,16 +1,20 @@
 // The dashboard. Layers:
 //   Landing (pick or create a profile) → Home hub → one of three modes:
-//     🛠️ Create – your workshop: make games in the Game Maker, or write a
-//                 brief to build a coded game together with Claude Code
-//     🧪 Test   – try your own games privately, then publish them
+//     🛠️ Create – your workshop: make games in the Game Maker, or design a
+//                 coded game in the Game Designer (designer.js) for Claude to build
+//     🧪 Test   – try your own games privately, improve them, then publish them
 //     ▶ Play    – the shared library of published games, with credits and scores
+//   plus 🔑 Studio (studio.js) for the Creator, the supervising grown-up.
 // Screens are chosen by the address after "#", e.g. index.html#/play.
 import {
-  listProfiles, getProfile, saveProfile, getCurrentProfileId, setCurrentProfileId,
-  listGames, getGame, saveGame, deleteGame, getGameStats, getLeaderboard, testUrl,
-  listBriefs, getBrief, saveBrief, deleteBrief,
+  listProfiles, getProfile, saveProfile, getCurrentProfileId, setCurrentProfileId, hashPasscode, checkPasscode,
+  listGames, getGame, saveGame, deleteGame, getGameStats, getLeaderboard, testUrl, listBriefs, listFeedback,
 } from "./shared/store.js";
 import { TEMPLATES, getTemplate } from "./templates/index.js";
+import { LOVES, GAME_TYPES } from "./shared/questions.js";
+import { esc, go, avatar, choices, bindChoices, emojiOptions, confirmTap, header, isCreator } from "./ui.js";
+import { designScreen, refineScreen } from "./designer.js";
+import { studioScreen } from "./studio.js";
 
 const app = document.getElementById("app");
 document.body.classList.add("dashboard"); // also styles the page when hosted without our <body> tag
@@ -25,95 +29,9 @@ const GAME_EMOJI = ["🧺", "🚀", "🛸", "🚗", "🏎️", "🐱", "🐶", "
   "🍎", "🍕", "🍩", "⭐", "💎", "🪙", "⚽", "🏀", "🐟", "🥕", "💣", "☄️", "🌵", "🔥", "👻", "🦇",
   "🕷️", "🌧️", "🧊", "🪨", "⚡", "🦠"];
 
-const LOVES = [
-  ["space", "🚀 Space"], ["animals", "🐾 Animals"], ["dinosaurs", "🦖 Dinosaurs"], ["football", "⚽ Football"],
-  ["cars", "🏎️ Cars"], ["building", "🧱 Building"], ["ocean", "🌊 Ocean"], ["robots", "🤖 Robots"],
-  ["magic", "🧙 Magic"], ["ninjas", "🥷 Ninjas"], ["food", "🍕 Food"], ["music", "🎵 Music"],
-  ["bikes", "🚲 Bike riding"], ["surfing", "🏄 Surfing"], ["skateboarding", "🛹 Skateboarding"],
-];
-const GAME_TYPES = [
-  ["catching", "🧺 Catching"], ["dodging", "☄️ Dodging"], ["racing", "🏁 Racing"], ["puzzles", "🧩 Puzzles"],
-  ["quizzes", "❓ Quizzes"], ["platformers", "🍄 Jumping"], ["building", "🏗️ Building"], ["mazes", "🌀 Mazes"],
-];
 // Asked now so we know who wants multiplayer when it's added later.
 const PLAY_STYLES = [["solo", "🙋 On my own"], ["together", "👬 With my brothers"], ["both", "🔀 Both!"]];
 const SPEEDS = { 1: "🐢", 2: "🐇", 3: "🐎", 4: "🏎️", 5: "🚀" };
-
-// Choices for Claude Code briefs.
-const BRIEF_TYPES = [...GAME_TYPES, ["new", "✨ Something new"]];
-const CONTROLS = [
-  ["left-right", "⬅️➡️ Move left & right"], ["all-around", "🕹️ Move all around"], ["jump", "🦘 Jump"],
-  ["throw", "🎯 Throw or shoot (cartoon)"], ["tap", "👆 Tap things"], ["drag", "✋ Drag things"], ["type", "⌨️ Type answers"],
-];
-const LOOKS = [
-  ["space", "🌌 Space"], ["underwater", "🌊 Underwater"], ["jungle", "🌴 Jungle"], ["city", "🏙️ City"],
-  ["castle", "🏰 Castle"], ["snow", "❄️ Snow"], ["desert", "🏜️ Desert"], ["pixel", "👾 Pixel art"], ["neon", "💡 Neon"],
-];
-const SOUNDS = [["bleeps", "🔊 Bleeps & bloops"], ["music", "🎵 Music"], ["quiet", "🤫 Quiet"]];
-const CHANGES = [
-  ["easier", "🐢 Make it easier"], ["harder", "🔥 Make it harder"], ["character", "🦸 New character"],
-  ["level", "🗺️ New level"], ["powerup", "⚡ Power-up"], ["sound", "🔊 Sounds"], ["look", "🎨 New look"], ["bug", "🐞 Fix a bug"],
-];
-const labelFor = (options, values) =>
-  values.map((v) => options.find(([id]) => id === v)?.[1] ?? v).join(", ") || "(not chosen)";
-
-// ---------- Helpers ----------
-
-// Escape anything typed by a player before putting it into the page.
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-const go = (path) => { location.hash = `#/${path}`; };
-
-function avatar(profile, size = "") {
-  if (!profile) return `<span class="avatar ${size}" style="background:#555">❔</span>`;
-  return `<span class="avatar ${size}" style="background:${esc(profile.colour)}">${esc(profile.icon)}</span>`;
-}
-
-/** A row of tappable choice buttons. Clicking updates `state[field]` (an array if multi). */
-function choices(field, options, selected, { multi = false, kind = "chip" } = {}) {
-  const isOn = (v) => (multi ? selected.includes(v) : selected === v);
-  return `<div class="choices ${kind}s" data-field="${field}" data-multi="${multi}">
-    ${options.map(([value, label]) => `
-      <button type="button" class="${kind} ${isOn(value) ? "on" : ""}" data-value="${esc(value)}"
-        ${kind === "swatch" ? `style="background:${esc(value)}" aria-label="${esc(value)}"` : ""}>${label}</button>`).join("")}
-  </div>`;
-}
-
-/** Wire up every choices() row inside `root` so taps change `state`. */
-function bindChoices(root, state, onChange = () => {}) {
-  root.querySelectorAll(".choices").forEach((row) => {
-    row.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-value]");
-      if (!btn) return;
-      const { field, multi } = row.dataset;
-      const value = btn.dataset.value;
-      if (multi === "true") {
-        const list = state[field];
-        const i = list.indexOf(value);
-        i >= 0 ? list.splice(i, 1) : list.push(value);
-        btn.classList.toggle("on");
-      } else {
-        state[field] = isNaN(value) || value === "" ? value : Number(value);
-        row.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b === btn));
-      }
-      onChange(field);
-    });
-  });
-}
-
-const emojiOptions = (list) => list.map((e) => [e, e]);
-
-/**
- * Two-tap confirmation for risky buttons (pop-up confirm() dialogs are blocked
- * in some places the dashboard runs). First tap asks, second tap within 3s confirms.
- */
-function confirmTap(button, question) {
-  if (button.dataset.armed) return true;
-  const original = button.textContent;
-  button.dataset.armed = "1";
-  button.textContent = question;
-  setTimeout(() => { delete button.dataset.armed; button.textContent = original; }, 3000);
-  return false;
-}
 
 // ---------- Router ----------
 
@@ -121,34 +39,26 @@ async function route() {
   const [screen = "", id] = location.hash.replace(/^#\/?/, "").split("/");
   const me = await getProfile(getCurrentProfileId());
 
-  if (!me && !["", "new"].includes(screen)) return go("");
+  if (!me && !["", "new", "creator", "unlock"].includes(screen)) return go("");
 
   const screens = {
     "": () => landingScreen(me),
     new: () => profileScreen(null),
-    me: () => profileScreen(me),
+    me: () => (isCreator(me) ? creatorScreen(me) : profileScreen(me)),
+    creator: () => creatorScreen(null),
+    unlock: () => unlockScreen(id),
     home: () => homeScreen(me),
     create: () => createScreen(me),
     make: () => makeScreen(me, id),
-    brief: () => briefScreen(me, id),
-    prompt: () => promptScreen(me, id),
-    change: () => changeScreen(me, id),
+    design: () => designScreen(me, id),
+    refine: () => refineScreen(me, id),
+    studio: () => studioScreen(me),
     test: () => testScreen(me),
     play: () => playScreen(me),
     game: () => gameScreen(me, id),
   };
   await (screens[screen] ?? screens.home)();
   window.scrollTo(0, 0);
-}
-
-function header(me, active) {
-  const tab = (path, label) => `<a href="#/${path}" class="${active === path ? "active" : ""}">${label}</a>`;
-  return `<header class="topbar">
-    <a class="logo" href="#/home">🎮 <span class="label">Hironic Games</span></a>
-    <nav>${tab("home", "🏠 Home")}${tab("create", "🛠️ Create")}${tab("test", "🧪 Test")}${tab("play", "▶ Play")}</nav>
-    <a class="me ${active === "me" ? "active" : ""}" href="#/me">${avatar(me, "small")}<span class="label">${esc(me.name)}</span></a>
-    <a class="switch" href="#/" title="Switch player">🔄</a>
-  </header>`;
 }
 
 // ---------- Landing: who's playing? ----------
@@ -161,12 +71,86 @@ async function landingScreen(me) {
     <p class="tagline">Make games. Test them. Play everyone's!</p>
     <h2>Who's playing?</h2>
     <div class="profile-grid">
-      ${profiles.map((p) => `<button class="profile-tile ${p.id === me?.id ? "current" : ""}" data-id="${p.id}">${avatar(p, "big")}<span>${esc(p.name)}</span></button>`).join("")}
+      ${profiles.map((p) => `<button class="profile-tile ${p.id === me?.id ? "current" : ""}" data-id="${p.id}" data-role="${p.role ?? "player"}">
+        ${avatar(p, "big")}<span>${isCreator(p) ? "🔑 " : ""}${esc(p.name)}</span></button>`).join("")}
       <a class="profile-tile new" href="#/new"><span class="avatar big" style="background:#3a4180">➕</span><span>New player</span></a>
     </div>
+    ${profiles.some(isCreator) ? "" : `<p class="creator-link"><a href="#/creator">🔑 Grown-up? Set up the Creator account</a></p>`}
   </main>`;
   app.querySelectorAll(".profile-tile[data-id]").forEach((tile) =>
-    tile.addEventListener("click", () => { setCurrentProfileId(tile.dataset.id); go("home"); }));
+    tile.addEventListener("click", () => {
+      // The Creator needs their passcode; players just tap.
+      if (tile.dataset.role === "creator") return go(`unlock/${tile.dataset.id}`);
+      setCurrentProfileId(tile.dataset.id);
+      go("home");
+    }));
+}
+
+// ---------- 🔑 Creator: set up and unlock ----------
+
+async function creatorScreen(existing) {
+  if (!existing && (await listProfiles()).some(isCreator)) return go("");
+  const state = existing ? { ...existing } : { name: "", icon: "🦸", colour: COLOURS[0], role: "creator" };
+  app.innerHTML = `${existing ? header(existing, "me") : ""}
+  <main class="form-page">
+    <h1>🔑 ${existing ? "Creator settings" : "Set up the Creator"}</h1>
+    <p class="intro">The Creator is the grown-up who supervises: you approve designs, send them to Claude Code and can test every draft.</p>
+    <form id="creator-form">
+      <section class="card preview-card">
+        <span id="preview">${avatar(state, "big")}</span>
+        <label>Your name <input name="name" maxlength="20" required value="${esc(state.name)}" placeholder="e.g. Dad" autocomplete="off"></label>
+      </section>
+      <section class="card" id="look">
+        <h2>Icon</h2>${choices("icon", emojiOptions(PROFILE_ICONS), state.icon, { kind: "emoji" })}
+        <h2>Colour</h2>${choices("colour", COLOURS.map((c) => [c, ""]), state.colour, { kind: "swatch" })}
+      </section>
+      <section class="card">
+        <h2>${existing ? "New passcode (leave blank to keep it)" : "Choose a passcode"}</h2>
+        <p class="hint">At least 4 characters. On this test version it keeps the boys out of the Studio but isn't real security; Phase 2 checks it on the server.</p>
+        <label>Passcode <input name="code" type="password" minlength="4" ${existing ? "" : "required"} autocomplete="new-password"></label>
+        <label>Type it again <input name="code2" type="password" autocomplete="new-password"></label>
+        <p class="error" id="error" hidden></p>
+      </section>
+      <button class="big-button" type="submit">💾 Save</button>
+    </form>
+  </main>`;
+  const form = document.getElementById("creator-form");
+  bindChoices(form.querySelector("#look"), state, () => { document.getElementById("preview").innerHTML = avatar(state, "big"); });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const data = new FormData(form);
+    const code = data.get("code");
+    const error = document.getElementById("error");
+    if (code && code !== data.get("code2")) { error.textContent = "The two passcodes don't match."; error.hidden = false; return; }
+    state.name = data.get("name").trim();
+    if (code) state.passcodeHash = await hashPasscode(code);
+    const saved = await saveProfile(state);
+    setCurrentProfileId(saved.id);
+    go("studio");
+  });
+}
+
+async function unlockScreen(id) {
+  const creator = await getProfile(id);
+  if (!isCreator(creator)) return go("");
+  app.innerHTML = `<main class="form-page center">
+    ${avatar(creator, "big")}
+    <h1>🔑 ${esc(creator.name)}</h1>
+    <form id="unlock" class="card">
+      <label>Creator passcode <input name="code" type="password" required autocomplete="current-password" autofocus></label>
+      <p class="error" id="error" hidden>That's not the passcode.</p>
+      <div class="actions"><a class="button" href="#/">← Back</a><button class="big-button" type="submit">Unlock</button></div>
+    </form>
+  </main>`;
+  document.getElementById("unlock").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!(await checkPasscode(creator, new FormData(e.target).get("code")))) {
+      document.getElementById("error").hidden = false;
+      return;
+    }
+    setCurrentProfileId(creator.id);
+    go("studio");
+  });
 }
 
 // ---------- Home hub: choose a mode ----------
@@ -192,8 +176,17 @@ async function homeScreen(me) {
         <span class="emoji">▶️</span><h2>Play</h2><p>Play games made by everyone and beat the high scores.</p>
         <small>${published} of yours published</small>
       </a>
+      ${isCreator(me) ? `<a class="mode-card studio" href="#/studio">
+        <span class="emoji">🔑</span><h2>Studio</h2><p>Approve designs and improvements, and send them to Claude.</p>
+        <small>${await waitingForCreator()} waiting for you</small>
+      </a>` : ""}
     </div>
   </main>`;
+}
+
+async function waitingForCreator() {
+  const ready = (list) => list.filter((r) => r.status === "ready").length;
+  return ready(await listBriefs()) + ready(await listFeedback());
 }
 
 // ---------- Create / edit profile ----------
@@ -289,8 +282,10 @@ async function myGames(me) {
 
 // ---------- 🛠️ Create mode: your workshop ----------
 
-// Maker games open in the Game Maker; coded games are changed by asking Claude.
-const editUrl = (g) => (g.kind === "code" ? `#/change/${encodeURIComponent(g.id)}` : `#/make/${g.id}`);
+// Maker games open in the Game Maker; coded games are improved with Claude.
+const editUrl = (g) => (g.kind === "code" ? `#/refine/${encodeURIComponent(g.id)}` : `#/make/${g.id}`);
+const editLabel = (g) => (g.kind === "code" ? "🔧 Improve" : "✏️ Edit");
+const BRIEF_STATUS = { designing: "✏️ Still designing", ready: "📨 Sent to the Creator", approved: "🔨 Being built" };
 
 async function createScreen(me) {
   const games = await myGames(me);
@@ -298,13 +293,13 @@ async function createScreen(me) {
   const briefs = (await listBriefs(me.id)).filter((b) => !builtBriefs.has(b.id));
   const cards = games.map((g) => gameCard(g, me, `
     <p class="badges"><span>${templateBadge(g)}</span><span>${statusBadge(g)}</span></p>
-    <p class="hint">${g.kind === "code" ? "Tap to ask Claude for changes 🤖" : "Tap to edit ✏️"}</p>`, editUrl(g)));
+    <p class="hint">Tap to ${editLabel(g)}</p>`, editUrl(g)));
   const ideaCards = briefs.map((b) => `
-    <a class="game-card idea" href="#/prompt/${b.id}">
-      <span class="emoji">${esc(b.heroIcon || "💡")}</span>
+    <a class="game-card idea" href="#/design/${b.id}">
+      <span class="emoji">🤖</span>
       <h2>${esc(b.title || "Untitled idea")}</h2>
-      <p class="badges"><span>${b.copiedAt ? "📋 Sent to Claude" : "💡 Idea"}</span></p>
-      <p class="hint">Waiting to be built with Claude</p>
+      <p class="badges"><span>${BRIEF_STATUS[b.status] ?? ""}</span></p>
+      ${b.creatorNote && b.status === "designing" ? `<p class="hint">🔑 The Creator left you a note</p>` : ""}
     </a>`);
 
   app.innerHTML = `${header(me, "create")}
@@ -313,9 +308,9 @@ async function createScreen(me) {
     <p class="intro">Your workshop. New games start as drafts – only you can see them until you publish.</p>
     <div class="game-grid">
       <a class="game-card new-game" href="#/make"><span class="emoji">🧩</span><h2>Game Maker</h2><p>Quick: pick a template and your characters</p></a>
-      <a class="game-card new-game claude" href="#/brief"><span class="emoji">🤖</span><h2>Code it with Claude</h2><p>Big ideas: describe your dream game and build real code together</p></a>
+      <a class="game-card new-game claude" href="#/design"><span class="emoji">🤖</span><h2>Game Designer</h2><p>Big ideas: answer some questions and Claude builds your game in real code</p></a>
     </div>
-    ${ideaCards.length ? `<h2 class="section-title">💡 Ideas for Claude</h2><div class="game-grid">${ideaCards.join("")}</div>` : ""}
+    ${ideaCards.length ? `<h2 class="section-title">🤖 My designs</h2><div class="game-grid">${ideaCards.join("")}</div>` : ""}
     ${cards.length ? `<h2 class="section-title">🎮 My games</h2><div class="game-grid">${cards.join("")}</div>` : ""}
   </main>`;
 }
@@ -328,7 +323,7 @@ async function testScreen(me) {
     <p class="badges"><span>${templateBadge(g)}</span><span>${statusBadge(g)}</span></p>
     <div class="actions">
       <a class="button" href="${testUrl(g)}">🧪 Test</a>
-      <a class="button" href="${editUrl(g)}">${g.kind === "code" ? "🤖 Change" : "✏️ Edit"}</a>
+      <a class="button" href="${editUrl(g)}">${editLabel(g)}</a>
       ${g.status === "published"
         ? `<button class="button" data-unpublish="${g.id}">🙈 Unpublish</button>`
         : `<button class="big-button" data-publish="${g.id}">🚀 Publish</button>`}
@@ -377,7 +372,8 @@ async function playScreen(me) {
 
 async function gameScreen(me, rawId) {
   const game = await getGame(decodeURIComponent(rawId ?? ""));
-  if (!game || (game.status !== "published" && game.authorId !== me.id)) return go("play");
+  // Drafts are only visible to their author and the Creator.
+  if (!game || (game.status !== "published" && game.authorId !== me.id && !isCreator(me))) return go("play");
   const author = game.kind === "maker" ? await getProfile(game.authorId) : null;
   const board = await getLeaderboard(game.id);
   const remixOf = game.remixOf ? await getGame(game.remixOf) : null;
@@ -394,7 +390,7 @@ async function gameScreen(me, rawId) {
       <p>${esc(game.description ?? template?.description ?? "")}</p>
       <div class="actions">
         <a class="big-button" href="${game.url}">▶ Play</a>
-        ${isMine ? `<a class="button" href="${editUrl(game)}">${game.kind === "code" ? "🤖 Change" : "✏️ Edit"}</a>` : ""}
+        ${isMine ? `<a class="button" href="${editUrl(game)}">${editLabel(game)}</a>` : ""}
         ${game.kind === "maker" && !isMine ? `<button class="button" id="remix">🔀 Remix</button>` : ""}
       </div>
     </section>
@@ -522,197 +518,6 @@ async function makeScreen(me, id) {
     await saveGame(collect());
     go("create");
   });
-}
-
-// ---------- 🤖 Code it with Claude ----------
-// The player writes a brief; the dashboard turns it into a request to paste
-// into Claude Code, which uses the /build-game skill (.claude/skills/build-game).
-
-async function briefScreen(me, id) {
-  const existing = id ? await getBrief(id) : null;
-  const b = existing ?? {
-    title: "", type: me.about?.gameTypes?.[0] ?? "new", heroIcon: "🦸", hero: "", goal: "", challenge: "",
-    controls: [], look: [], sounds: ["bleeps"], extra: "", helper: "",
-  };
-
-  app.innerHTML = `${header(me, "create")}
-  <main class="form-page">
-    <h1>🤖 Code it with Claude</h1>
-    <p class="intro">Tell Claude about your game. Don't worry about getting it perfect – Claude will ask you questions too!</p>
-    <form id="brief">
-      <section class="card">
-        <h2>🏷️ What's your game called?</h2>
-        <input name="title" maxlength="40" required value="${esc(b.title)}" placeholder="e.g. Shark Attack Splash" autocomplete="off">
-        <h2>🎲 What kind of game is it?</h2>
-        ${choices("type", BRIEF_TYPES, b.type)}
-      </section>
-      <section class="card">
-        <h2>🦸 Who are you in the game?</h2>
-        ${choices("heroIcon", emojiOptions(GAME_EMOJI), b.heroIcon, { kind: "emoji" })}
-        <textarea name="hero" rows="2" maxlength="200" placeholder="e.g. a hungry shark with a jetpack">${esc(b.hero)}</textarea>
-        <h2>🏆 How do you win or get points?</h2>
-        <textarea name="goal" rows="2" maxlength="300" placeholder="e.g. eat fish to grow bigger">${esc(b.goal)}</textarea>
-        <h2>😬 What makes it tricky?</h2>
-        <textarea name="challenge" rows="2" maxlength="300" placeholder="e.g. submarines chase you and it gets faster">${esc(b.challenge)}</textarea>
-      </section>
-      <section class="card">
-        <h2>🕹️ How do you play? <small>(pick any)</small></h2>
-        ${choices("controls", CONTROLS, b.controls, { multi: true })}
-        <h2>🎨 What does it look like?</h2>
-        ${choices("look", LOOKS, b.look, { multi: true })}
-        <h2>🔊 Sounds</h2>
-        ${choices("sounds", SOUNDS, b.sounds, { multi: true })}
-      </section>
-      <section class="card">
-        <h2>✨ Anything else?</h2>
-        <textarea name="extra" rows="3" maxlength="500" placeholder="Levels, power-ups, a boss, secret bonus…">${esc(b.extra)}</textarea>
-        <h2>🤝 Who's helping you build it? <small>(optional)</small></h2>
-        <input name="helper" maxlength="40" value="${esc(b.helper)}" placeholder="e.g. Dad" autocomplete="off">
-      </section>
-      <div class="actions sticky">
-        <button type="submit" class="big-button">💾 Save idea</button>
-        <a class="button" href="${existing ? `#/prompt/${existing.id}` : "#/create"}">Cancel</a>
-      </div>
-    </form>
-  </main>`;
-
-  const form = document.getElementById("brief");
-  form.querySelectorAll("section").forEach((section) => bindChoices(section, b));
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const data = new FormData(form);
-    for (const field of ["title", "hero", "goal", "challenge", "extra", "helper"]) b[field] = data.get(field).trim();
-    const saved = await saveBrief({ ...b, authorId: me.id });
-    go(`prompt/${saved.id}`);
-  });
-}
-
-/** The text pasted into Claude Code for a brand-new game. */
-function newGamePrompt(b, me) {
-  const about = me.about ?? {};
-  return `/build-game
-
-NEW GAME request from the Hironic Games dashboard.
-
-Player: ${me.name} ${me.icon} (age ${me.age ?? "?"})${b.helper ? `, building with ${b.helper}` : ""}. They are here with you – build it together.
-Loves: ${labelFor(LOVES, [...(about.loves ?? []), ...(about.lovesOther ? [about.lovesOther] : [])])}
-Likes playing: ${labelFor(GAME_TYPES, about.gameTypes ?? [])}
-
-GAME BRIEF
-- Name: ${b.title}
-- Kind of game: ${labelFor(BRIEF_TYPES, [b.type])}
-- Hero: ${b.heroIcon} ${b.hero || "(not described)"}
-- How to win / score: ${b.goal || "(not described)"}
-- What makes it tricky: ${b.challenge || "(not described)"}
-- Controls: ${labelFor(CONTROLS, b.controls)}
-- Look: ${labelFor(LOOKS, b.look)}
-- Sounds: ${labelFor(SOUNDS, b.sounds)}
-- Extra ideas: ${b.extra || "(none)"}
-
-Credit: author "${me.name}", authorIcon "${me.icon}", briefId "${b.id}"`;
-}
-
-/** The text pasted into Claude Code to change an existing coded game. */
-function changePrompt(game, me, wanted, details) {
-  return `/build-game
-
-CHANGE REQUEST from the Hironic Games dashboard.
-
-Player: ${me.name} ${me.icon} (age ${me.age ?? "?"}). They are here with you – make the changes together.
-Game: "${game.title}" in games/${game.slug}/
-
-What to change: ${labelFor(CHANGES, wanted)}
-Details: ${details || "(none – ask the player)"}`;
-}
-
-/** Copy text to the clipboard, falling back to selecting it for older browsers. */
-async function copyText(text, textarea, button) {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    textarea.select();
-    document.execCommand("copy");
-  }
-  button.textContent = "✅ Copied!";
-  setTimeout(() => (button.textContent = "📋 Copy for Claude"), 2000);
-}
-
-const CLAUDE_STEPS = `
-  <ol class="steps">
-    <li><b>Copy</b> the message below.</li>
-    <li>Open <b>Claude Code</b> (claude.ai/code, the desktop app, or the Claude app on a phone or tablet) on the <b>Hironic-games</b> project.</li>
-    <li><b>Paste</b> it and send. Claude will ask you some questions – answer them together.</li>
-    <li>When Claude has finished and the change is on the main branch, your game appears in <a href="#/test">🧪 Test</a>.</li>
-  </ol>`;
-
-async function promptScreen(me, id) {
-  const b = await getBrief(id);
-  if (!b || b.authorId !== me.id) return go("create");
-  const text = newGamePrompt(b, me);
-
-  app.innerHTML = `${header(me, "create")}
-  <main class="form-page">
-    <section class="card game-detail">
-      <span class="emoji huge">${esc(b.heroIcon)}</span>
-      <h1>${esc(b.title)}</h1>
-      <p>Your idea is saved! Now build it with Claude:</p>
-    </section>
-    <section class="card">
-      ${CLAUDE_STEPS}
-      <textarea id="prompt" class="prompt" rows="14" readonly>${esc(text)}</textarea>
-      <div class="actions">
-        <button class="big-button" id="copy">📋 Copy for Claude</button>
-        <a class="button" href="#/brief/${b.id}">✏️ Change idea</a>
-        <button class="button danger" id="delete">🗑️ Delete</button>
-      </div>
-    </section>
-  </main>`;
-
-  const textarea = document.getElementById("prompt");
-  document.getElementById("copy").addEventListener("click", async (e) => {
-    await copyText(text, textarea, e.currentTarget);
-    await saveBrief({ id: b.id, copiedAt: Date.now() });
-  });
-  document.getElementById("delete").addEventListener("click", async (e) => {
-    if (!confirmTap(e.currentTarget, "Tap again to delete")) return;
-    await deleteBrief(b.id);
-    go("create");
-  });
-}
-
-async function changeScreen(me, rawId) {
-  const game = await getGame(decodeURIComponent(rawId ?? ""));
-  if (!game || game.kind !== "code" || game.authorId !== me.id) return go("create");
-  const state = { wanted: [] };
-
-  app.innerHTML = `${header(me, "create")}
-  <main class="form-page">
-    <section class="card game-detail">
-      <span class="emoji huge">${esc(game.icon)}</span>
-      <h1>${esc(game.title)}</h1>
-      <p>Ask Claude to change your game.</p>
-      <div class="actions"><a class="button" href="${testUrl(game)}">🧪 Test it first</a></div>
-    </section>
-    <section class="card" id="wanted">
-      <h2>What do you want to change?</h2>
-      ${choices("wanted", CHANGES, state.wanted, { multi: true })}
-      <h2>Tell Claude more</h2>
-      <textarea id="details" rows="3" maxlength="500" placeholder="e.g. add a golden fish worth 10 points"></textarea>
-    </section>
-    <section class="card">
-      ${CLAUDE_STEPS}
-      <textarea id="prompt" class="prompt" rows="10" readonly></textarea>
-      <div class="actions"><button class="big-button" id="copy">📋 Copy for Claude</button></div>
-    </section>
-  </main>`;
-
-  const details = document.getElementById("details");
-  const textarea = document.getElementById("prompt");
-  const refresh = () => (textarea.value = changePrompt(game, me, state.wanted, details.value.trim()));
-  bindChoices(document.getElementById("wanted"), state, refresh);
-  details.addEventListener("input", refresh);
-  refresh();
-  document.getElementById("copy").addEventListener("click", (e) => copyText(textarea.value, textarea, e.currentTarget));
 }
 
 window.addEventListener("hashchange", route);

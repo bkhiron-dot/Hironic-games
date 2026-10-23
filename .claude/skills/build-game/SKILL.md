@@ -5,9 +5,17 @@ description: Build a new hand-coded game, or change an existing one, from a requ
 
 # Build a game with a Hironic player
 
-The message comes from the dashboard's **🤖 Code it with Claude** screen. A child (7, 10 or 12) is usually at the keyboard with a parent. They want to be **involved**, not handed a finished game. Read `CLAUDE.md` first; its principles (child-safe, touch-friendly, zero build, readable code) apply to everything here.
+The message comes from the dashboard. A player (aged 7, 10 or 12) designed the game in the **🤖 Game Designer**, or gave feedback in **🔧 Improve**. The **Creator** (the supervising parent) approved it in the **🔑 Studio** and pasted it here. Read `CLAUDE.md` first; its principles (child-safe, touch-friendly, zero build, readable code) apply to everything here.
 
-## 1. Talk before coding
+## 1. Approved plan or open brief?
+- **"Plan agreed … approved by Creator"** (the normal case): the design conversation already happened in the dashboard. **Don't re-ask the questions.** Build straight from the answers:
+  - Picked options are choices; quoted text is the player's own idea, so honour it.
+  - "(Claude's question)" lines came from live AI follow-ups.
+  - Where answers conflict or are missing, choose the simplest version that fits and say what you chose.
+  - Stop to ask the Creator only if something can't be built as described, or breaks the content rules.
+- **Anything else** (an older-style brief, or a request without approval): talk first, as below.
+
+## 1b. Talk before coding (only when the plan isn't approved yet)
 - Greet the player by name. Write for their age: short sentences, emoji welcome. For a 7-year-old, assume an adult is reading aloud.
 - Ask **2–4 quick questions** about whatever the brief leaves unclear (e.g. "Should the shark get bigger when it eats?"). Offer choices (A/B/C) rather than open questions.
 - Play back the plan in **3–5 bullets** and wait for a "yes" before writing code. Keep version 1 small; save extra ideas for "next time" and list them at the end.
@@ -25,8 +33,9 @@ The message comes from the dashboard's **🤖 Code it with Claude** screen. A ch
   ```
   `author` must exactly match the player's profile name; that's how credit and editing are linked. Always start as `status: "draft"`. The player publishes it from Test mode.
 
-## 2b. Change request
-- Open `games/<slug>/game.js`, explain in one or two kid-friendly sentences how the relevant part works now, then agree the change as in step 1.
+## 2b. Change request (feedback round)
+- Open `games/<slug>/game.js`. Turn the feedback into concrete changes: "too hard" or "too easy" means retuning the "Things to try changing" constants, while "power-up", "new level" and so on are new features. Honour quoted own ideas.
+- If the request is approved by the Creator, make the changes; otherwise explain how the relevant part works in one or two kid-friendly sentences and agree the change first.
 - Keep the game's `status` as it is. Don't rename the slug (scores are stored against it).
 
 ## 3. Check it works
@@ -35,8 +44,8 @@ The message comes from the dashboard's **🤖 Code it with Claude** screen. A ch
 - Keep test scripts in the scratchpad, not the repo.
 
 ## 4. Finish
-- Commit with a message like `Add Shark Splash by Sam` (or `Shark Splash: add golden fish (Sam)`), then push.
-- Tell the player, in their language:
+- Commit with a message like `Add Shark Splash by Sam` (or `Shark Splash: round 2 – golden fish (Sam)`), then push.
+- Tell the player and the Creator, in the player's language:
   - once it's merged to the main branch and the site updates, it appears in **🧪 Test**, where they can try it and press **🚀 Publish**;
   - the "Things to try changing" values they could experiment with;
   - the "next time" ideas list.
