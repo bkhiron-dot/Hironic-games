@@ -21,19 +21,28 @@ function loadV1Track() {
 // Is s on (or within `margin` of) a jump, from the start of its kicker to the end of its landing?
 const onJump = (s, margin) => T.jumps.some(j => s > j.s - j.kick - margin && s < j.end + margin);
 
-test('Hardline keeps v1 shape on the hill: same centreline, and the riding line at the same height away from jumps', () => {
+test('Hardline keeps v1 shape on the hill: same centreline, and the riding line at v1 height away from jumps', () => {
   const v1 = loadV1Track();
-  let checked = 0;
+  // The last jump was reshaped in tuning round 2 (lower knuckle, steeper landing), so after it
+  // the trail sits lower than v1 by a fixed amount, but keeps v1's shape.
+  const last = T.jumps[T.jumps.length - 1];
+  let checked = 0, offsetAfterLast = null;
   for (let s = 0; s < T.length; s += 0.83) {
     const p = T.pointAt(s), d = -p.z;
     assert.ok(Math.abs(p.x - v1.cx(d)) < 1e-9, `centreline at s = ${s}`);
     // v1 measured jumps straight down the hill, so its jumps sit slightly differently: skip them
     const v1Jump = v1.JUMPS.some(j => d > j.s - j.kick - 3 && d < j.s + j.gap + j.land + 3);
     if (onJump(s, 3) || v1Jump) continue;
-    assert.ok(Math.abs(T.ground(s, 0) - v1.ground(d, 0)) < 1e-6, `riding line at s = ${s.toFixed(1)}: ${T.ground(s, 0)} vs v1 ${v1.ground(d, 0)}`);
+    let diff = T.ground(s, 0) - v1.ground(d, 0);
+    if (s > last.end) {
+      if (offsetAfterLast === null) offsetAfterLast = diff;
+      diff -= offsetAfterLast;
+    }
+    assert.ok(Math.abs(diff) < 1e-6, `riding line at s = ${s.toFixed(1)}: ${diff} m from v1`);
     checked++;
   }
   assert.ok(checked > 1000, `only ${checked} points checked`);
+  console.log(`  after the reshaped last jump the trail is ${(-offsetAfterLast).toFixed(2)} m lower than v1`);
 });
 
 test('the trail is its full width square to the path, on bends too', () => {

@@ -34,13 +34,17 @@ export const JUMP_KINDS = {
       { pop: 3, from: 46, to: 54, outcome: 'smooth' },
     ],
   },
-  // Big jump that needs a pop: full pop lands smooth at about 52-64 km/h; without one you case it.
+  // Big jump that needs a pop: a full pop lands smooth at about 50-58 km/h; without one you
+  // case it below about 60 (flat out, 61+ km/h, it clears without a pop).
+  // Reshaped with Ben (tuning round 2): longer, higher take-off (12 m kicker, 1.8 m lip),
+  // lower knuckle (1.8 m, was 2.4), and a steeper landing (0.6, was 0.4) so it still lands
+  // at speeds riders can reach. Flags are where the game's landings touch down.
   bigPop: {
-    big: true, kick: 10, lip: 1.5, gap: 12, hole: -1.2, knuck: 2.4, pitch: 0.4,
-    short: 10.6, sweet0: 11.8, sweet1: 24.5, long: 28,
+    big: true, kick: 12, lip: 1.8, gap: 11, hole: -1.2, knuck: 1.8, pitch: 0.6,
+    short: 10.8, sweet0: 12.0, sweet1: 23.5, long: 26,
     landings: [
-      { pop: 3, from: 52, to: 64, outcome: 'smooth' },
-      { pop: 0, from: 46, to: 64, outcome: 'not smooth' },
+      { pop: 3, from: 50, to: 58, outcome: 'smooth' },
+      { pop: 0, from: 46, to: 60, outcome: 'not smooth' },
     ],
   },
 };
