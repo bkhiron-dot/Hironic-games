@@ -71,6 +71,8 @@ export function terrainData(trail, random) {
       } else if (e < -0.01) {
         // on the trail: packed dirt, redder clay on kickers, landings and berm walls
         tmp.copy(c.trail).lerp(c.trail2, n * 0.35 + 0.3 * (Math.abs(off) / w));
+        // the worn riding line down the middle: darker, damper, packed loam
+        tmp.lerp(c.loam, 0.3 * Math.max(0, 1 - Math.abs(off) / (0.45 * w)));
         if (onKicker || zone === 'knuckle' || zone === 'sweet' || zone === 'bottom') tmp.lerp(c.clay, 0.55);
         if (zone === 'sweet') tmp.lerp(c.trail, 0.25);
         const berm = bermAmount(s);

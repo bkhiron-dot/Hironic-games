@@ -1,4 +1,4 @@
-// The rainforest: tall gums, tree ferns, undergrowth and rocks.
+// The rainforest: tall gums, tree ferns, undergrowth, rocks, ground ferns and mossy logs.
 // planForest() decides where everything goes (plain data, testable in Node);
 // buildForest() turns that into meshes. Everything is grouped into 100 m chunks
 // so only the forest near the rider is drawn.
@@ -13,6 +13,8 @@ const CANOPY_COLOURS = [0x4e5f35, 0x5a6b3d, 0x46552f, 0x617043];
 const FERN_COLOURS = [0x4f7a34, 0x5b8a3b, 0x46702e];
 const BUSH_COLOURS = [0x23391e, 0x2b4424, 0x1f331b, 0x31502a];
 const ROCK_COLOURS = [0x6f736b, 0x7d8178, 0x5f6359];
+const GROUND_FERN_COLOURS = [0x5f9a3c, 0x6fa844, 0x4f8a34];
+const LOG_COLOURS = [0x5a4a32, 0x4e5a30, 0x655238]; // dead wood, some of it mossy
 
 // Plants are placed at a distance s along the trail and an offset square to it. On the inside
 // of a bend a long offset can reach back toward the trail, so every spot is checked against
@@ -29,7 +31,7 @@ export function planForest(trail, random) {
     const cleared = !!trail.trailhead && trail.trailhead.keepClear(p.x, p.z);
     return { x: p.x, z: p.z, s: at.s, y: trail.groundAt(p.x, p.z), cleared };
   };
-  const emptyLists = () => ({ trunks: [], canopy: [], fernTrunks: [], fernCrowns: [], bushes: [], rocks: [] });
+  const emptyLists = () => ({ trunks: [], canopy: [], fernTrunks: [], fernCrowns: [], bushes: [], rocks: [], groundFerns: [], logs: [] });
   const chunk = spot => {
     if (spot.cleared) return emptyLists(); // thrown away
     const k = Math.floor(spot.s / CHUNK_LENGTH);
@@ -101,7 +103,76 @@ export function planForest(trail, random) {
       }
     }
   }
+  // Ground ferns and fallen mossy logs. Scenery only (you ride through ferns; logs lie
+  // clear of the trail). Their own random sequence, so nothing else moves.
+  const extra = makeRandom(trail.seed + 3);
+  for (let n = 0; n < 2600; n++) {
+    const s = -10 + extra() * (length + 80), side = extra() < 0.5 ? -1 : 1;
+    const spot = place(s, side * (halfWidth(s) + 0.6 + Math.pow(extra(), 1.3) * 28), 0.5);
+    const w = 0.35 + extra() * 0.5, ry = extra() * 6, c = pickFrom(extra, GROUND_FERN_COLOURS);
+    if (spot) chunk(spot).groundFerns.push({ x: spot.x, y: spot.y - 0.05, z: spot.z, sx: w, sy: w * 0.8, sz: w, ry, c });
+  }
+  for (let n = 0; n < 260; n++) {
+    const s = -10 + extra() * (length + 80), side = extra() < 0.5 ? -1 : 1;
+    const off = side * (halfWidth(s) + 3 + extra() * 35), r = 0.18 + extra() * 0.25, len = 3 + extra() * 7, yaw = extra() * Math.PI;
+    const c = pickFrom(extra, LOG_COLOURS);
+    const mid = place(s, off, 2);
+    if (!mid) continue;
+    // both ends must be clear of the trail too, and the log lies along the ground
+    const ex = Math.sin(yaw) * len / 2, ez = Math.cos(yaw) * len / 2;
+    const ends = [[mid.x - ex, mid.z - ez], [mid.x + ex, mid.z + ez]];
+    if (ends.some(([x, z]) => { const at = trail.locate(x, z); return Math.abs(at.off) < halfWidth(at.s) + 2 || (trail.trailhead && trail.trailhead.keepClear(x, z)); })) continue;
+    const [a, b] = ends.map(([x, z]) => new THREE.Vector3(x, trail.groundAt(x, z) + r * 0.6, z));
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+    const centre = a.clone().add(b).multiplyScalar(0.5);
+    chunk(mid).logs.push({ x: centre.x, y: centre.y, z: centre.z, sx: r, sy: a.distanceTo(b), sz: r, q, c });
+  }
   return { chunks, treeBuckets };
+}
+
+/* ---------- Shapes ---------- */
+
+// A tree fern's crown: a rosette of long fronds that arch up and droop at the tips, about
+// 1 m across and 0.7 m high (instances scale it). One shape, many fronds.
+function frondCrown(count = 14) {
+  const SEGMENTS = 6, positions = [], index = [];
+  for (let n = 0; n < count; n++) {
+    const angle = n / count * Math.PI * 2 + (n % 2) * 0.2, lift = n % 2 ? 0.75 : 1; // two rings of fronds
+    const ca = Math.cos(angle), sa = Math.sin(angle), base = positions.length / 3;
+    for (let i = 0; i <= SEGMENTS; i++) {
+      const t = i / SEGMENTS, r = t, y = lift * (0.9 * t - 0.95 * t * t) + 0.1; // arch up, then droop
+      const w = 0.13 * Math.sin(Math.PI * Math.min(1, t * 1.15)) + 0.01;    // widest in the middle
+      positions.push(ca * r - sa * w, y, sa * r + ca * w, ca * r + sa * w, y, sa * r - ca * w);
+      if (i) { const k = base + (i - 1) * 2; index.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); }
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setIndex(index);
+  g.computeVertexNormals();
+  return g;
+}
+
+// Pale gum bark: long vertical streaks of cream, grey and tan, with darker strips of
+// peeling bark low down. Tinted per tree by the instance colour.
+function barkTexture() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 256;
+  const g = canvas.getContext('2d'), random = makeRandom(11);
+  g.fillStyle = '#efebe2'; g.fillRect(0, 0, 64, 256);
+  for (let n = 0; n < 70; n++) {
+    const x = random() * 64, w = 1 + random() * 4, y = random() * 256, h = 40 + random() * 200;
+    g.fillStyle = pickFrom(random, ['#d8d0c0', '#c9c2b4', '#e6dccb', '#b9b2a6', '#f7f4ee']);
+    g.fillRect(x, y, w, h);
+  }
+  for (let n = 0; n < 10; n++) { // ribbons of shed bark near the base
+    g.fillStyle = pickFrom(random, ['#8a7358', '#9b8466', '#76634c']);
+    g.fillRect(random() * 64, 180 + random() * 60, 2 + random() * 5, 20 + random() * 50);
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(2, 1);
+  return texture;
 }
 
 // One InstancedMesh per kind of plant per chunk: thousands of plants in a few draw calls.
@@ -111,7 +182,7 @@ function instanced(scene, geometry, material, list, castShadow) {
   const dummy = new THREE.Object3D(), colour = new THREE.Color();
   list.forEach((it, i) => {
     dummy.position.set(it.x, it.y, it.z);
-    dummy.rotation.set(it.rx || 0, it.ry || 0, it.rz || 0);
+    if (it.q) dummy.quaternion.copy(it.q); else dummy.rotation.set(it.rx || 0, it.ry || 0, it.rz || 0);
     dummy.scale.set(it.sx, it.sy, it.sz);
     dummy.updateMatrix();
     mesh.setMatrixAt(i, dummy.matrix);
@@ -129,10 +200,12 @@ function instanced(scene, geometry, material, list, castShadow) {
 export function buildForest(scene, plan) {
   const white = () => new THREE.MeshLambertMaterial({ color: 0xffffff }); // instance colours tint it
   const shapes = {
-    trunks: [new THREE.CylinderGeometry(0.6, 1, 1, 7), white(), true],
+    trunks: [new THREE.CylinderGeometry(0.6, 1, 1, 9), new THREE.MeshLambertMaterial({ color: 0xffffff, map: barkTexture() }), true],
     canopy: [new THREE.IcosahedronGeometry(1, 0), white(), true],
-    fernTrunks: [new THREE.CylinderGeometry(0.11, 0.15, 1, 5), white(), false],
-    fernCrowns: [new THREE.ConeGeometry(1, 0.7, 9, 1, true), new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }), true],
+    fernTrunks: [new THREE.CylinderGeometry(0.12, 0.17, 1, 6), white(), false],
+    fernCrowns: [frondCrown(), new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }), true],
+    groundFerns: [frondCrown(10), new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }), false],
+    logs: [new THREE.CylinderGeometry(1, 1, 1, 8), white(), true],
     bushes: [new THREE.IcosahedronGeometry(1, 0), white(), false],
     rocks: [new THREE.DodecahedronGeometry(1, 0), white(), false],
   };

@@ -7,7 +7,7 @@ import { createScene, buildMountains, followWithSun } from './scene.js';
 import { buildTerrain } from './terrain.js';
 import { planForest, buildForest } from './forest.js';
 import { buildMarkers } from './markers.js';
-import { createKit, createBike, updateCranks } from './bike.js';
+import { createKit, createBike, updateCranks, spinWheels } from './bike.js';
 import { createRider, updateLegs } from './rider.js';
 import { createDirt } from './dirt.js';
 import { createTracks } from './tracks.js';
@@ -42,7 +42,7 @@ buildMountains(scene, trail, random);
 buildMarkers(scene, trail);
 
 const kit = createKit();
-const { bike, chassis, cranks } = createBike(scene, kit);
+const { bike, chassis, cranks, wheels } = createBike(scene, kit);
 const { rider, upper, legs } = createRider(chassis, kit);
 const dirt = createDirt(scene, camera);
 const tracks = createTracks(scene, trail);
@@ -92,6 +92,7 @@ function frame(now) {
   upper.position.y = -comp;
   upper.rotation.z = pedalling ? Math.sin(crankAngle) * 0.035 : upper.rotation.z * 0.9; // body rocks with each stroke
   updateCranks(cranks, crankAngle);
+  spinWheels(wheels, b.v * dt);
   if (rider.parent === chassis) updateLegs(legs, crankAngle, comp);
 
   chaseCamera.update(dt, b, run.state, menuTime, rider.position);
@@ -103,7 +104,7 @@ function frame(now) {
 }
 
 // Adding ?debug to the address hands the game's state to testing tools (screenshots, tuning).
-if (new URLSearchParams(location.search).has('debug')) window.hardline = { b, keys, run, trail, dirt, tracks, chaseCamera };
+if (new URLSearchParams(location.search).has('debug')) window.hardline = { b, keys, run, trail, dirt, tracks, chaseCamera, camera };
 
 run.resetRun();
 requestAnimationFrame(frame);

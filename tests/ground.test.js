@@ -106,11 +106,11 @@ test('no cliffs across the trail and out to 60 m either side, all the way down',
   }
 });
 
-test('no tree, fern, bush or rock grows on the trail; gum count matches v1 for the longer path', () => {
+test('no tree, fern, bush, rock or log grows on the trail; gum count matches v1 for the longer path', () => {
   const random = makeRandom(T.seed);
   terrainData(T, random);
   const plan = planForest(T, random);
-  for (const [kind, gap] of [['trunks', 1.2], ['fernTrunks', 0.4], ['bushes', 2.5], ['rocks', 0.6]]) {
+  for (const [kind, gap] of [['trunks', 1.2], ['fernTrunks', 0.4], ['bushes', 2.5], ['rocks', 0.6], ['groundFerns', 0.5], ['logs', 2]]) {
     for (const chunk of Object.values(plan.chunks)) for (const it of chunk[kind]) {
       const at = T.locate(it.x, it.z);
       assert.ok(Math.abs(at.off) >= T.halfWidth(at.s) + gap - 1e-9, `${kind} at s = ${at.s.toFixed(1)} is ${Math.abs(at.off).toFixed(2)} m from the centreline`);

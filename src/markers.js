@@ -80,7 +80,35 @@ function landingFlags(scene, trail) {
   }
 }
 
+// Trail marker posts every 100 m, Maydena style: a short wooden post with the trail's
+// grade colour and the distance ridden. On the left, clear of jumps, splits and gates.
+const GRADE_COLOURS = { green: '#3f9a4a', blue: '#2f6fc0', black: '#1b1b1b' };
+function markerPosts(scene, trail) {
+  const wood = new THREE.MeshLambertMaterial({ color: 0x6b4f33 });
+  const busy = s => trail.jumps.some(j => s > j.s - j.kick - 25 && s < j.end + 5) || [trail.start.gate, ...trail.splits].some(g => Math.abs(s - g) < 12);
+  for (let s = 100; s < trail.length - 20; s += 100) {
+    let at = s;
+    while (busy(at) && at < s + 60) at += 5;
+    if (busy(at)) continue;
+    const off = -(trail.halfWidth(at) + 1.0);
+    scene.add(putAt(new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.12), wood), trail, at, off, 0.5)).castShadow = true;
+    const canvas = document.createElement('canvas');
+    canvas.width = 64; canvas.height = 96;
+    const g = canvas.getContext('2d');
+    g.fillStyle = GRADE_COLOURS[trail.difficulty] || '#2f6fc0'; g.fillRect(0, 0, 64, 64);
+    g.fillStyle = '#f3f1ea'; g.fillRect(0, 64, 64, 32);
+    g.fillStyle = '#1a0d06'; g.font = 'bold 26px Arial, sans-serif'; g.textAlign = 'center';
+    g.fillText(`${s} m`, 32, 90);
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.3), new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide }));
+    putAt(plate, trail, at, off, 0.85);
+    plate.rotation.y = facing(trail, at);
+    plate.translateZ(0.07);
+    scene.add(plate);
+  }
+}
+
 export function buildMarkers(scene, trail) {
+  markerPosts(scene, trail);
   if (trail.trailhead) {
     // the trail's own gate in the clearing carries its name in its colour
     const own = trail.trailhead.gates.find(g => g.open);
@@ -119,7 +147,7 @@ function mapTexture(trail) {
   const g = canvas.getContext('2d');
   g.fillStyle = '#efe6cf'; g.fillRect(0, 0, 512, 512);
   g.fillStyle = '#1d2e1f'; g.textAlign = 'center';
-  g.font = 'bold 40px Arial, sans-serif'; g.fillText('TRAILHEAD', 256, 50);
+  g.font = 'bold 36px Arial, sans-serif'; g.fillText('MID MOUNTAIN TRAILHEAD', 256, 46);
   // the trail's line, top of the hill at the top of the board
   const points = [];
   for (let s = 0; s <= trail.length; s += 5) points.push(trail.pointAt(s));
