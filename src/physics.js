@@ -6,12 +6,15 @@
 //   { type: 'toast', text }          show a message
 //   { type: 'shake', amount }        shake the camera (heavy landing)
 //   { type: 'landing', use, zone }   touched down: share of suspension travel used, and where
+//   { type: 'bermHit', strength, side } slid into a berm hard (strength 0..1, side +1 = right)
 //   { type: 'crash', reason, big }   the rider came off; always the last event
 import { clamp } from './util.js';
 import { TREE_BUCKET_LENGTH } from './forest.js';
 
 export const G = 9.8;      // gravity on the ground
 export const G_AIR = 15;   // deliberately 1.5 g in the air for snappier, shorter jumps
+const BERM_HIT_MIN = 0.3;   // sliding into a berm harder than this (slide 0..1) is a "hit"...
+const BERM_HIT_SWING = 0.6; // ...which swings the bike 60% of the way to the berm's direction
 
 export function createBikeState() {
   return {
@@ -25,6 +28,7 @@ export function createBikeState() {
     grip: 0, slide: 0,               // share of tyre grip in use, and how hard it's sliding 0..1
     drift: 0, slipV: 0,              // visual drift angle, sideways slip speed (m/s)
     slideMem: 0, caught: false,      // fades after a slide; a berm can catch you while it lasts
+    slidePeak: 0,                    // hardest slide (0..1) since the last time you had grip
     fromLip: false, popped: false,   // left the ground off a kicker; already popped this jump
     stuckT: 0, slideToastT: 0,       // timers: stuck in a hole, and gap between drift messages
   };
@@ -41,7 +45,7 @@ export function placeBikeAtPoint(b, trail, x, z, h, speed) {
   Object.assign(b, {
     x, z, s: trail.locate(x, z).s, y: trail.groundAt(x, z), h, v: speed, vy: 0,
     lean: 0, air: false, pitch: 0, airT: 0, susX: 0, susV: 0, compress: 0, steerIn: 0,
-    drift: 0, slide: 0, slipV: 0, slideMem: 0, caught: false,
+    drift: 0, slide: 0, slipV: 0, slideMem: 0, slidePeak: 0, caught: false,
   });
 }
 
@@ -58,7 +62,7 @@ export function stepRide(b, keys, trail, treeBuckets, timing, dt) {
   steer(b, keys, dt);
   // The rider's right, taken before cornering turns the bike; sideways slip moves along it.
   const rx = Math.cos(b.h), rz = Math.sin(b.h);
-  corner(b, trail, sNow, off, dt, toast);
+  corner(b, trail, sNow, off, dt, toast, events);
 
   // move: sideways slip, then forward along the new heading
   b.x += rx * b.slipV * dt; b.z += rz * b.slipV * dt;
@@ -114,7 +118,7 @@ function steer(b, keys, dt) {
 }
 
 // Cornering: lean asks for sideways grip; tyres and berms decide how much you get.
-function corner(b, trail, s, off, dt, toast) {
+function corner(b, trail, s, off, dt, toast, events) {
   const { groundAt } = trail;
   b.slide = 0; b.grip = 0;
   const rx = Math.cos(b.h), rz = Math.sin(b.h); // rider's right, flat
@@ -139,9 +143,24 @@ function corner(b, trail, s, off, dt, toast) {
       b.v = Math.max(0, b.v - excess * 0.22 * dt);
       b.slipV = clamp(b.slipV - turn * excess * 0.55 * dt, -4, 4);
       b.slideMem = 1;
+      b.slidePeak = Math.max(b.slidePeak, b.slide);
     }
     const onBerm = tanBank > 0.25;
     if (onBerm && b.slideMem > 0) {
+      // Berm hit: sliding into the wall, the tyres dig in and the berm turns you: the bike
+      // swings round to run along the berm (the trail's direction here) and the sideways
+      // speed is added to the forward speed, so no speed is lost. A burst of dirt shows it.
+      const slip = Math.abs(b.slipV), strength = Math.min(1, Math.max(b.slidePeak * b.slideMem, slip / 1.5));
+      if (!b.caught && strength > BERM_HIT_MIN) {
+        let swing = trail.headingAt(s) - b.h;
+        swing = Math.atan2(Math.sin(swing), Math.cos(swing));
+        if (Math.sign(swing) === turn) b.h += swing * BERM_HIT_SWING; // only ever round the corner
+        b.v = Math.sqrt(b.v * b.v + slip * slip);
+        b.slipV *= 0.2;
+        b.caught = true;
+        events.push({ type: 'bermHit', strength, side: turn });
+        toast('Berm hit!');
+      }
       // Berm catch: the wall stops the sideways slide and pushes the bike back round the
       // corner, giving back some of the speed the slide scrubbed.
       b.slipV *= Math.exp(-9 * dt);
@@ -158,7 +177,7 @@ function corner(b, trail, s, off, dt, toast) {
     b.h += b.steerIn * 2.0 * dt; b.drift *= 0.9; b.slipV *= 0.9;
   }
   b.slideMem = Math.max(0, b.slideMem - dt * 0.8);
-  if (b.slideMem === 0) b.caught = false;
+  if (b.slideMem === 0) { b.caught = false; b.slidePeak = 0; }
   b.slideToastT -= dt;
   if (b.slide > 0.25 && b.slideToastT <= 0) { toast('Drifting: ride up the berm to hook back in'); b.slideToastT = 3; }
 }

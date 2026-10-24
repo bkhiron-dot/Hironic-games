@@ -6,7 +6,8 @@ import { G, placeBikeAt, placeBikeAtPoint, stepRide } from './physics.js';
 import { releaseAll } from './input.js';
 import { formatTime } from './hud.js';
 
-export function createRun({ b, keys, trail, scene, chassis, rider, treeBuckets, hud, scores, chaseCamera }) {
+// effects: the dirt thrown up on berm hits and landings (visual only).
+export function createRun({ b, keys, trail, scene, chassis, rider, treeBuckets, hud, scores, chaseCamera, effects }) {
   const { spawn, gate } = trail.start; // where the bike waits at the gate, and the timing gate
   const splitsAt = trail.splits, th = trail.trailhead; // th: the clearing at the top, if any
   let state = 'menu', runTime = 0, timing = false, nextSplit = 0, crashes = 0, splits = [];
@@ -87,6 +88,8 @@ export function createRun({ b, keys, trail, scene, chassis, rider, treeBuckets, 
     for (const e of events) {
       if (e.type === 'toast') hud.toast(e.text);
       else if (e.type === 'shake') chaseCamera.setShake(e.amount);
+      else if (e.type === 'bermHit') { effects.bermHit(b, e.strength, e.side); chaseCamera.setShake(0.15 * e.strength); }
+      else if (e.type === 'landing') effects.landing(b, e.use);
       else if (e.type === 'crash') { crash(e.reason, e.big); return; }
     }
     stopAtFence(x0, z0);

@@ -9,7 +9,8 @@ import { planForest, buildForest } from './forest.js';
 import { buildMarkers } from './markers.js';
 import { createKit, createBike, updateCranks } from './bike.js';
 import { createRider, updateLegs } from './rider.js';
-import { createDust } from './dust.js';
+import { createDirt } from './dirt.js';
+import { createTracks } from './tracks.js';
 import { createBikeState, stepSuspension } from './physics.js';
 import { createChaseCamera } from './camera.js';
 import { createInput } from './input.js';
@@ -43,7 +44,8 @@ buildMarkers(scene, trail);
 const kit = createKit();
 const { bike, chassis, cranks } = createBike(scene, kit);
 const { rider, upper, legs } = createRider(chassis, kit);
-const dust = createDust(scene);
+const dirt = createDirt(scene, camera);
+const tracks = createTracks(scene, trail);
 const b = createBikeState();
 const chaseCamera = createChaseCamera(camera, trail, reduceMotion);
 const scores = createScoreStore(SCORES_KEY);
@@ -55,7 +57,7 @@ const keys = createInput({
   onEndRun: () => run.endRun('restart'),
   onStart: () => run.startRun(run.state === 'done' ? 'gate' : 'trailhead'), // Enter: drop in, or ride again
 });
-run = createRun({ b, keys, trail, scene, chassis, rider, treeBuckets: forestPlan.treeBuckets, hud, scores, chaseCamera });
+run = createRun({ b, keys, trail, scene, chassis, rider, treeBuckets: forestPlan.treeBuckets, hud, scores, chaseCamera, effects: dirt });
 document.getElementById('startBtn').addEventListener('click', () => run.startRun('trailhead'));
 document.getElementById('againBtn').addEventListener('click', () => run.startRun('gate'));
 document.getElementById('trailheadBtn').addEventListener('click', () => run.startRun('trailhead'));
@@ -76,7 +78,8 @@ function frame(now) {
 
   bike.position.set(b.x, b.y, b.z);
   bike.rotation.set(b.pitch, -(b.h + b.drift), -b.lean);
-  dust.update(dt, b, run.state === 'ride');
+  dirt.update(dt, b, run.state === 'ride');
+  tracks.update(b, run.state === 'ride');
 
   // cranks turn while pedalling, otherwise settle level
   const pedalling = run.state === 'ride' && keys.pedal && !b.air;
@@ -98,6 +101,9 @@ function frame(now) {
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
+
+// Adding ?debug to the address hands the game's state to testing tools (screenshots, tuning).
+if (new URLSearchParams(location.search).has('debug')) window.hardline = { b, keys, run, trail, dirt, tracks, chaseCamera };
 
 run.resetRun();
 requestAnimationFrame(frame);
