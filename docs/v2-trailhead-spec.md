@@ -41,6 +41,15 @@ Agreed with Ben on 24 Oct 2026. This is a separate game from v1; v1 scores are n
 - Shown on the start screen and whenever a run ends; tabs to switch trail and split.
 - Storage: localStorage via a `ScoreStore` interface (`load`, `add`, `top(trail, board)`), so a shared backend can be swapped in later.
 
+## The mountain (Ben, 24 Oct)
+
+- The trails are built as if part of Maydena Bike Park. Today's trailhead and its three trails are the **mid mountain**.
+- Later: **upper mountain** (fast and steep) and **lower mountain** (wide and flowing).
+
+## Look and feel
+
+- Style cue: Red Bull Bike Unchained. Our reading (to check with Ben): clean, chunky low-poly shapes, bold kit colours, a modern downhill bike and rider, and lots of dirt. Tyres leave tracks, throw crumbs when rolling and roost when drifting; drifting into a berm is a "berm hit" with an explosion of dirt.
+
 ## Open questions for later
 
 - Trail lengths: start equal, maybe lengthen black later.

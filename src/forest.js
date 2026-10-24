@@ -133,9 +133,10 @@ export function planForest(trail, random) {
 /* ---------- Shapes ---------- */
 
 // A tree fern's crown: a rosette of long fronds that arch up and droop at the tips, about
-// 1 m across and 0.7 m high (instances scale it). One shape, many fronds.
-function frondCrown(count = 14) {
-  const SEGMENTS = 6, positions = [], index = [];
+// 1 m across and 0.4 m high (instances scale it). One shape, many fronds; kept to a few
+// triangles each (14 fronds x 4 segments = 112), as there are thousands of ferns.
+function frondCrown(count = 14, SEGMENTS = 4) {
+  const positions = [], index = [];
   for (let n = 0; n < count; n++) {
     const angle = n / count * Math.PI * 2 + (n % 2) * 0.2, lift = n % 2 ? 0.75 : 1; // two rings of fronds
     const ca = Math.cos(angle), sa = Math.sin(angle), base = positions.length / 3;
@@ -204,7 +205,7 @@ export function buildForest(scene, plan) {
     canopy: [new THREE.IcosahedronGeometry(1, 0), white(), true],
     fernTrunks: [new THREE.CylinderGeometry(0.12, 0.17, 1, 6), white(), false],
     fernCrowns: [frondCrown(), new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }), true],
-    groundFerns: [frondCrown(10), new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }), false],
+    groundFerns: [frondCrown(7, 3), new THREE.MeshLambertMaterial({ color: 0xffffff, side: THREE.DoubleSide }), false],
     logs: [new THREE.CylinderGeometry(1, 1, 1, 8), white(), true],
     bushes: [new THREE.IcosahedronGeometry(1, 0), white(), false],
     rocks: [new THREE.DodecahedronGeometry(1, 0), white(), false],

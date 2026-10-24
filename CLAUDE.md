@@ -1,6 +1,6 @@
 # Hardline MTB
 
-A browser-based, third-person downhill mountain bike game built with Three.js. Inspired by Red Bull Hardline, set in Maydena-style Tasmanian rainforest (tall pale eucalypts, tree ferns, dark loamy dirt).
+A browser-based, third-person downhill mountain bike game built with Three.js. Inspired by Red Bull Hardline, set in Maydena-style Tasmanian rainforest (tall pale eucalypts, tree ferns, dark loamy dirt). The trails are built as if they were part of Maydena Bike Park: the current ones are a mid-mountain segment. Visual style cue: Red Bull Bike Unchained (clean, chunky low-poly shapes, bold kit colours, lots of flying dirt).
 
 Built by Ben with his three boys, partly as a way for them to learn coding. Keep code readable: plain names, short functions, comments that explain the *why* in plain English. The physics should feel lifelike but stay simple.
 
@@ -27,8 +27,10 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 - `src/jumps.js` - jump kinds (shape, landing flags, declared landing ranges). Trails place jumps by kind and may override numbers.
 - `src/trailhead.js` - `withTrailhead(trail)`: the level, fenced clearing above the trail's start gate, three start gates (green, blue, black; only the ridden trail's is open), the drop-in point, and the ground graded into the hill round it. `main.js` wraps the trail with it.
 - `public/v2.html` - redirect from the old v2 address to the home page.
+- `src/dirt.js` - dirt thrown up by the tyres (crumbs when rolling, roost and dust growing with drift, an explosion on a berm hit, puffs on landings). `src/tracks.js` - tyre tracks in the dirt. Both visual only.
+- Adding `?debug` to the address exposes the game state as `window.hardline` for test tools (screenshots, tuning).
 - `tools/jump-sim.js` - jump simulator: rides a jump with the game's own physics (`stepRide`, 1/240 s steps) on a straight test trail at -0.2 grade, or on a real trail (`rideJump`). `npm run jumps` prints every jump on every trail.
-- `tests/` - `node:test` tests. `ground.test.js` checks Flow Monster against v1's own code (read out of `public/v1.html`) away from jumps, and that the ground has no cliffs. `ride.test.js` rides the game's physics over every jump and the whole trail (`tests/helpers/ride.js`). `trailhead.test.js` checks the clearing (level, no cliffs, gates and fence, forest unmoved) and a run from the drop-in to the finish.
+- `tests/` - `node:test` tests. `ground.test.js` checks Flow Monster against v1's own code (read out of `public/v1.html`) away from jumps, and that the ground has no cliffs. `ride.test.js` rides the game's physics over every jump and the whole trail (`tests/helpers/ride.js`). `berm.test.js` checks berm hits. `trailhead.test.js` checks the clearing (level, no cliffs, gates and fence, forest unmoved) and a run from the drop-in to the finish.
 - `docs/v2-trailhead-spec.md` - the agreed design for the trailhead and the three trails.
 
 ## v1 state (what already works)
@@ -69,7 +71,8 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 | Tyre grip | mu 0.75 on trail, 0.5 off trail | |
 | Berm support | aMax = g (mu + tan b) / (1 - mu tan b) | tan b = ground rise toward outside of turn over 1 m |
 | Drift | sideways slip += excess x 0.55 dt, scrub excess x 0.22 dt | |
-| Berm catch | on berm (tan b > 0.25) after a slide: slip decays x exp(-9 dt), extra g x min(0.6, 0.8 tan b) turning, speed refund | |
+| Berm catch | on berm (tan b > 0.25) after a slide: slip decays x exp(-9 dt), extra g x min(0.6, 0.8 tan b) turning, speed refund |
+| Berm hit | first contact with a berm after a slide harder than 0.3 (slide peak x fading memory, or slip / 1.5 m/s): bike swings 60% of the way to the trail's heading (only round the corner), sideways speed added to forward speed (v = sqrt(v^2 + slip^2)), slip x 0.2 | step 3, Ben's request. Speed kept (-0.03 to +0.27 km/h at the hit); drifting wide into berms ran off the trail in 2 of 48 test runs, was 9 | |
 | Suspension travel | 0.55 m (0.40 m if crouched) | |
 | Landing decel | 38 m/s^2 | travel used = vi^2 / (2 x 38) / travel |
 | Landing outcome | < 0.55 smooth, < 1.0 heavy, < 1.35 small crash, else big crash | lean over 0.4 rad adds penalty |
@@ -101,6 +104,9 @@ Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diago
 - **The jump simulator rides the game's own physics** (tuning round 2). The old separate simulator had no air drag and popped exactly at the lip, so its ranges were up to 6 km/h off. Declared ranges must come from it, and must be reachable on the trail: check the fastest lip speed (table above) before shaping a jump. A higher lip or lower knuckle needs a steeper landing, or riders land too hard.
 - **The bike can't steer in the air**, so on a jump on a bend it flies straight while the trail curves away. Flow Monster's last jump (1037 m) is on a 145 m bend on the narrowest part of the trail (half width 2.3 m): ridden straight up the kicker it lands about 1.8 m off-centre. Riders (and `tests/helpers/ride.js`) aim the take-off at the landing.
 - **The trailhead clearing is cut into a valley**: the trail runs between banks that rise up to 20 m within 25 m of it, so a level 50 x 36 m pad with a smooth blend made cliffs (1.5 m per 0.5 m). The ground round it is graded instead: it may rise above or fall below the pad no faster than 0.7 (35 degrees, easing in over 6 m), and is the plain hill wherever that's gentler. Steepest step round it: 0.35 m per 0.5 m (limit 0.5). Past the gate the trail itself is untouched from 2 m on.
+- Anything drawn on the ground (tyre tracks) must also wind its triangles to face up, or it is culled and invisible.
+- Every plant kind added to the forest must be listed in the ground test's "nothing grows on the trail" check, with its gap.
+- Plant triangle budget: about 525k across 16 chunks, about 100k drawn at once (tree-fern crowns 112 each, ground ferns 42). Check phones before adding more.
 - The game must keep working at phone width with touch controls; no `alert`/`prompt`; text input must not trigger game keys.
 - The v1 shared scoreboard used the claude.ai artifact database (`window.claude.use('db')`). That does not exist outside claude.ai. v2 uses localStorage behind a small storage interface so a shared backend can be added later.
 
@@ -115,7 +121,8 @@ Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diago
    - **3b**: Flow Monster's berms higher and steeper, jumps unchanged (numbers to agree with Ben first).
 4. **Jolly Green Giant** (green): chill, optional jump rollers, progressing to moderate jumps by the bottom (like Flow Monster's first jumps); pump mechanic (kept, see spec).
 5. **Back in Black** (black): all mandatory gaps: a range of gaps, step-downs and step-ups. No B lines. New jump kinds declare landing ranges checked against reachable lip speeds.
-6. **Scores**: top 10 per trail per split, with trail tabs, fresh start (no v1 scores carried over).
+6. **Scores**: top 10 per trail per split, with trail tabs, fresh start (no v1 scores carried over). (Trail ids changed in step 3: `hardline` became `flow-monster`, so any v2 scores already saved on a device no longer show.)
 7. **Hosting** (done for the game: GitHub Pages on every push to main); then consider a shared score backend.
+8. **The rest of the mountain** (later): upper mountain (fast and steep) above the mid-mountain trailhead, lower mountain (wide and flowing) below it, Maydena-style.
 
 Every new jump or roller feature must declare its expected landing ranges (`landings` in `src/jumps.js`, or on the trail feature if it changes the shape); `tests/jumps.test.js` checks them all.
