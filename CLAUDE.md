@@ -80,11 +80,11 @@ Jump shapes and their declared landing ranges live in `src/jumps.js` and are che
 
 | Jump | Smooth | Notes |
 |---|---|---|
-| Normal (177 m, 743 m) | 46-68 no pop, 34-52 pop | lip 1.1 m, gap 6 m. Declared "big crash at 76 km/h" is a small crash in the game (pending Ben's re-baseline decision) |
-| Big, pop optional (438 m) | 54-68 no pop, 46-56 pop | lip 1.5 m, gap 9 m, 42 m landing. Declared 52-66 / 46-54 (pending; gap 8.5 m would restore them) |
+| Normal (177 m, 743 m) | 46-68 no pop, 34-52 pop | lip 1.1 m, gap 6 m. Too fast: small crash at 76, big crash from 78 km/h |
+| Big, pop optional (438 m) | 52-66 no pop, 46-54 pop | lip 1.5 m, gap 8.5 m (was 9; tuning round 2), 42 m landing |
 | Big, needs pop (1037 m) | 50-58 pop; without a pop not smooth below 61 | Reshaped with Ben (tuning round 2): kicker 12 m, lip 1.8 m, knuckle 1.8 m, gap 11 m, landing pitch 0.6 x 30 m. Flat out (61-65 km/h) it clears without a pop |
 
-Fastest reachable lip speed on Hardline (flat out, 300 m run-up, steering only): 177 m about 70, 438 m about 56, 743 m about 77, 1037 m about 63 km/h. So the "pop optional" jump only lands without a pop at 54-56 km/h.
+Fastest reachable lip speed on Hardline (flat out, 300 m run-up, steering only): 177 m about 70, 438 m about 56, 743 m about 77, 1037 m about 63 km/h. So the "pop optional" jump lands without a pop at 52-56 km/h on Hardline.
 
 Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diagonal) was ridden 15.5% long and landed smooth at about 53-79 km/h instead of 46-68. With `s` along the path it now lands smooth from 46 km/h in the game.
 
@@ -108,7 +108,7 @@ Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diago
 2. **Trail as data**:
    - **2a** (done): `defineTrail()` + `src/trails/hardline.js`; every module is handed its trail; still matches v1 exactly. Berms are automatic per trail, with `berms.adjust` for a stretch. Jump simulator keeps a constant -0.2 grade (agreed; real profile moves ranges by 1 km/h at most).
    - **2b** (done): `s` follows the winding path. Hardline keeps v1's shape on the hill (1297 m to ride). World-space hill with jump terraces; detailed ground strip plus hillside grid; forest regrown along the path. v1 step-for-step tests retired; replaced by ground tests (v1 riding line away from jumps, no cliffs, no trees on the trail) and game-physics ride tests (every jump, and a full run).
-   - **Tuning round**: PR 1 (done) fixed 1/240 s physics step. PR 2: the simulator uses the game's own physics; last jump reshaped (option A, Ben to playtest). Still to decide: re-baseline of the normal and pop-optional jumps. PR 3: Ben's playtest notes; in-game "How to ride" speeds.
+   - **Tuning round**: PR 1 (done) fixed 1/240 s physics step. PR 2: the simulator uses the game's own physics; last jump reshaped (option A, Ben to playtest); normal jumps re-baselined as measured; pop-optional gap 9 -> 8.5 m to restore its ranges. PR 3: Ben's playtest notes.
 3. **Trailhead**: see spec. Three start gates; riding through one selects that trail.
 4. **Jolly Green Giant** (green): rollers + pump mechanic.
 5. **Flow Monster** (blue): linked berms + tabletops.

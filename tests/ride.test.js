@@ -8,24 +8,14 @@ import { T, rideJump, rideTrail } from './helpers/ride.js';
 
 const speeds = (from, to) => { const r = []; for (let k = from; k <= to; k += 2) r.push(k); return r; };
 
-// Where the game and the simulator still disagree by more than the 2 km/h allowance.
-// Causes (measured, see CLAUDE.md "Known gotchas"): the game steps once per frame and
-// detects landings up to a step late, it has air drag, and its pop happens on the kicker
-// just before the lip. These show as TODO in the test run, without failing it, until the
-// tuning round decides how to close them.
-const KNOWN_GAPS = {
-  'normal big crash 0 76': 'at 76 km/h the game gives a small crash; the simulator a big one',
-};
-
 for (const j of T.jumps) {
   for (const landing of j.landings) {
     const { pop, from, to, outcome } = landing;
-    // The game rides the real trail with its own time step, which moves range edges a little.
-    // So check the declared range 2 km/h in from each edge (single-speed checks, like
-    // "big crash at 76 km/h", are checked as they are).
+    // Declared ranges come from a straight test trail; on Hardline the bends and the hill under
+    // each jump move range edges a little. So check the declared range 2 km/h in from each edge
+    // (single-speed checks, like "small crash at 76 km/h", are checked as they are).
     const lo = to - from >= 4 ? from + 2 : from, hi = to - from >= 4 ? to - 2 : to;
-    const gap = KNOWN_GAPS[`${j.kind} ${outcome} ${pop}`] || KNOWN_GAPS[`${j.kind} ${outcome} ${pop} ${from}`];
-    test(`in the game, ${T.name} jump at ${j.s} m (${j.kind}) lands ${outcome} from ${lo} to ${hi} km/h ${pop ? 'with a pop' : 'without a pop'}`, { todo: gap }, () => {
+    test(`in the game, ${T.name} jump at ${j.s} m (${j.kind}) lands ${outcome} from ${lo} to ${hi} km/h ${pop ? 'with a pop' : 'without a pop'}`, () => {
       const seen = [];
       for (const kmh of speeds(lo, hi)) {
         const r = rideJump(j, kmh, pop);
