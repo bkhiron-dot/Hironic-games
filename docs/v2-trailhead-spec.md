@@ -17,6 +17,7 @@ Agreed with Ben on 24 Oct 2026. This is a separate game from v1; v1 scores are n
 - Ben (24 Oct): chill, optional jump rollers, progressing to moderate size jumps by the bottom, similar to Flow Monster's first jumps. Keep the pump mechanic.
 - Wide (half-width about 4.5-5.5 m), gentle grade, big friendly berms on every real corner.
 - Long sets of rollers, no gaps, nothing that can case into a hole.
+- Ben (24 Oct): the whole trail can be rolled, but fast riders can pop and gap roller pairs. So each roller set declares two ranges: rolled (any speed) and gapped with a pop (from what speed). Both are tested like jump ranges.
 - **Pump mechanic** (the point of this trail):
   - Holding compress (Space / Pump button) on the *downslope* (backside) of a roller adds forward speed; holding it on the *upslope* costs a little speed. Releasing on the upslope near the crest gives a small pop.
   - **Popping off a roller** and landing on the next downslope (linking transitions) converts the drop into forward speed instead of losing it: reward a landing where the ground slope matches the trajectory.
@@ -45,6 +46,28 @@ Agreed with Ben on 24 Oct 2026. This is a separate game from v1; v1 scores are n
 
 - The trails are built as if part of Maydena Bike Park. Today's trailhead and its three trails are the **mid mountain**.
 - Later: **upper mountain** (fast and steep) and **lower mountain** (wide and flowing).
+- Three stages down the mountain, each with a green, blue and black line. Lines **meet only at trailheads**: a top trailhead, intermediate trailheads between stages, and the finish. No forks or merges mid-stage.
+- **One stage loaded at a time**: the next stage loads at an intermediate trailhead, with a short fade (about 0.5 s). This keeps phones fast: one trail is about 140k ground triangles and 11k plants.
+- **Lines kept at least 40 m apart**, except where they meet at trailheads. Each trail reshapes the ground 20 m either side, so closer lines would fight over it.
+- **Picking a line**: ride through its gate at a trailhead. Riding into another trail's gate switches to that trail (agreed).
+- **Rolling through trailheads**: riders keep their speed through an intermediate trailhead into the next stage. Each stage's start uses corners and trail pitch to bring speed into a known band before its first jump, so any incoming line works. Tests ride every combination of incoming and outgoing line (3 x 3 per trailhead) and check the speed at each jump's lip stays inside its declared range.
+
+### Modes
+
+- **Freeride**: untimed, any line at any trailhead.
+- **Race**: timed, one colour top to bottom (green-green-green, blue-blue-blue or black-black-black).
+  - Splits at each trailhead.
+  - Scores per race route and per stage.
+- **Race barricades**: in race mode, barricades make a course through each trailhead from the incoming line to the same colour's outgoing gate, like a World Cup or Hardline race. They mix sponsor banners and tape on posts. Sponsors are made up for the game; no real brands.
+
+### Build order
+
+1. 3b: Flow Monster berms.
+2. Jolly Green Giant.
+3. Back in Black.
+4. Scores, built per route and stage.
+5. The mountain as data: stages, trailheads, modes and barricades.
+6. Upper stage, then lower stage.
 
 ## Look and feel
 

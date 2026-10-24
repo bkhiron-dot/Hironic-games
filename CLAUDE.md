@@ -127,6 +127,11 @@ Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diago
 5. **Back in Black** (black): all mandatory gaps: a range of gaps, step-downs and step-ups. No B lines. New jump kinds declare landing ranges checked against reachable lip speeds.
 6. **Scores**: top 10 per trail per split, with trail tabs, fresh start (no v1 scores carried over). (Trail ids changed in step 3: `hardline` became `flow-monster`, so any v2 scores already saved on a device no longer show.)
 7. **Hosting** (done for the game: GitHub Pages on every push to main); then consider a shared score backend.
-8. **The rest of the mountain** (later): upper mountain (fast and steep) above the mid-mountain trailhead, lower mountain (wide and flowing) below it, Maydena-style.
+8. **The rest of the mountain** (later): upper mountain (fast and steep) above the mid-mountain trailhead, lower mountain (wide and flowing) below it, Maydena-style. Agreed design (see spec, "The mountain"):
+   - three stages, each with a green, blue and black line;
+   - lines meet only at trailheads, and are kept at least 40 m apart elsewhere;
+   - one stage loaded at a time;
+   - rolling starts: each stage's start brings speed into a known band, tested for every incoming x outgoing line;
+   - freeride (untimed, any line) and race mode (timed, one colour top to bottom, barricaded course through trailheads).
 
 Every new jump or roller feature must declare its expected landing ranges (`landings` in `src/jumps.js`, or on the trail feature if it changes the shape); `tests/jumps.test.js` checks them all.
