@@ -82,7 +82,7 @@ Jump shapes and their declared landing ranges live in `src/jumps.js` and are che
 |---|---|---|
 | Normal (177 m, 743 m) | 46-68 no pop, 34-52 pop | lip 1.1 m, gap 6 m. Too fast: small crash at 76, big crash from 78 km/h |
 | Big, pop optional (438 m) | 52-66 no pop, 46-54 pop | lip 1.5 m, gap 8.5 m (was 9; tuning round 2), 42 m landing |
-| Big step-down, kind `bigPop` (1037 m) | 52-62 no pop, 46-52 pop | Shaped with Ben (tuning rounds 2-3): kicker 12 m, lip 2.2 m, knuckle 1.6 m, gap 10 m, landing 48 m at pitch 0.8. Sweet spot 11.5-28 m past the lip. Drops 23 m below grade, so riders leave it at about 76 km/h. No longer needs a pop above 52 km/h |
+| Big, needs pop, kind `bigPop` (1037 m) | 54-66 pop; no pop cases | Shaped with Ben (tuning rounds 2-4): kicker 12 m, lip 1.8 m, gap 12 m, knuckle 2.4 m, landing 48 m at pitch 0.7. Sweet spot 12.3-30.1 m past the lip. Round 3's 2.2 m lip overshot with a pop at speed; this one is built for a fast pop (lip reachable at about 62 on Hardline) |
 
 Fastest reachable lip speed on Hardline (flat out, 300 m run-up, steering only): 177 m about 70, 438 m about 56, 743 m about 77, 1037 m about 63 km/h. So the "pop optional" jump lands without a pop at 52-56 km/h on Hardline.
 

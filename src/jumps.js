@@ -37,21 +37,19 @@ export const JUMP_KINDS = {
       { pop: 3, from: 46, to: 54, outcome: 'smooth' },
     ],
   },
-  // Big step-down jump: high kicker, low knuckle, long steep landing. Clears without a pop
-  // from about 52 km/h (smooth to 62); slower than that, a full pop lands it (46-52).
-  // Shaped with Ben (tuning rounds 2 and 3): 12 m kicker, 2.2 m lip, 1.6 m knuckle, 10 m gap,
-  // and a long steep landing (48 m at 0.8, about 39 degrees) for a long sweet spot: smooth
-  // landings touch down anywhere from 11.5 to 28 m past the lip. The landing drops about 23 m
-  // more than the hill's grade, so riders come off it fast (about 76 km/h on Hardline).
+  // Big jump that needs a pop, built for speed: a full pop at the lip lands smooth from about
+  // 54 to 66 km/h (on Hardline you reach the lip at up to about 62). Without a pop you case it.
+  // Shaped with Ben (tuning rounds 2-4): 12 m kicker, 1.8 m lip, a long 12 m gap to a high
+  // 2.4 m knuckle, and a long steep landing (48 m at 0.7), so a fast pop carries well out:
+  // smooth landings touch down from 12.3 to 30.1 m past the lip.
   // Flags are where the game's landings touch down.
   bigPop: {
-    big: true, popOptional: true, kick: 12, lip: 2.2, gap: 10, hole: -1.2, knuck: 1.6, pitch: 0.8, land: 48,
-    short: 9.8, sweet0: 11.5, sweet1: 28, long: 32.5,
+    big: true, kick: 12, lip: 1.8, gap: 12, hole: -1.2, knuck: 2.4, pitch: 0.7, land: 48,
+    short: 11.5, sweet0: 12.3, sweet1: 30.1, long: 35,
     landings: [
-      { pop: 3, from: 46, to: 52, outcome: 'smooth' },
-      { pop: 0, from: 52, to: 62, outcome: 'smooth' },
-      { pop: 0, from: 40, to: 44, outcome: 'big crash' }, // too slow, no pop: cased
-      { pop: 3, from: 60, to: 64, outcome: 'big crash' }, // too fast with a pop: overshot
+      { pop: 3, from: 54, to: 66, outcome: 'smooth' },
+      { pop: 3, from: 44, to: 48, outcome: 'big crash' }, // too slow even with a pop: cased
+      { pop: 0, from: 46, to: 62, outcome: 'big crash' }, // no pop: cased
     ],
   },
 };
