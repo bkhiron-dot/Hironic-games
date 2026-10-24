@@ -3,7 +3,7 @@
 // and reports where it lands and how hard. Uses the same ground shape and landing
 // rules as the game (see CLAUDE.md "Tuned physics"), so if the game physics change,
 // change them here too and re-run `npm test`.
-import { JUMP_KINDS, resolveJump, jumpProfile } from '../src/jumps.js';
+import { resolveJump, jumpProfile } from '../src/jumps.js';
 
 export const G_GROUND = 9.8;
 export const G_AIR = 15;
@@ -56,12 +56,12 @@ export function sweep(j, pop = 0, from = 30, to = 76, step = 2) {
   return rows;
 }
 
-// `npm run jumps` prints a table for every jump kind.
+// `npm run jumps` prints a table for every jump on every trail.
 if (import.meta.url === `file://${process.argv[1]}`) {
-  for (const name of Object.keys(JUMP_KINDS)) {
-    const j = jumpOfKind(name);
+  const { TRAILS } = await import('../src/trails/index.js');
+  for (const trail of TRAILS) for (const j of trail.jumps) {
     for (const pop of [0, 3]) {
-      console.log(`\n${name}${pop ? ' (full pop)' : ' (no pop)'}`);
+      console.log(`\n${trail.name}, jump at ${j.s} m (${j.kind})${pop ? ', full pop' : ', no pop'}`);
       for (const r of sweep(j, pop)) console.log(`  ${String(r.kmh).padStart(3)} km/h  lands ${r.landAt?.toFixed(1).padStart(5)} m  ${r.outcome}`);
     }
   }
