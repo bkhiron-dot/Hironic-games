@@ -8,12 +8,10 @@ export default defineConfig({
   // must be relative rather than starting at the site root.
   base: './',
   build: {
-    // Two pages: the home page, and v2 while it is being built. v1 is copied from public/.
+    // The game is the home page. v1 (the reference build) and the old v2.html link are
+    // copied as they are from public/.
     rollupOptions: {
-      input: {
-        main: page('./index.html'),
-        v2: page('./v2.html'),
-      },
+      input: { main: page('./index.html') },
     },
   },
 });

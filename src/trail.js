@@ -177,6 +177,8 @@ export function defineTrail(data) {
     scenery: { rocky: [], ...data.scenery }, jumps, berms,
     halfWidth, curvature, hillHeight, jumpHeight, lineHeight, kickerAt, jumpZone,
     bermAmount, bermHeight, ground, groundAt,
+    // on the riding surface (full grip, low drag)? (x, z) is the same point in the world
+    onTrail: (s, off) => Math.abs(off) <= halfWidth(s) + 0.3,
     pointAt: path.pointAt, headingAt: path.headingAt, locate: path.locate,
     downhillAt: path.downhillAt, pathAt: path.pathAt,
   };

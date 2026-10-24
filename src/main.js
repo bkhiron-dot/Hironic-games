@@ -1,7 +1,8 @@
-// Hardline MTB v2: builds the world, wires the parts together and runs the frame loop.
+// Hardline MTB: builds the world, wires the parts together and runs the frame loop.
 import './style.css';
 import { makeRandom } from './util.js';
 import { FLOW_MONSTER } from './trails/index.js';
+import { withTrailhead } from './trailhead.js';
 import { createScene, buildMountains, followWithSun } from './scene.js';
 import { buildTerrain } from './terrain.js';
 import { planForest, buildForest } from './forest.js';
@@ -30,7 +31,8 @@ const { renderer, scene, camera, sun } = createScene(document.getElementById('ga
 
 // The world, built in v1's order. Terrain colours, forest and mountains share one
 // random sequence, so the order decides where every tree grows.
-const trail = FLOW_MONSTER;
+// One trail at a time for now, with the trailhead clearing at its top.
+const trail = withTrailhead(FLOW_MONSTER);
 const random = makeRandom(trail.seed);
 buildTerrain(scene, renderer, trail, random);
 const forestPlan = planForest(trail, random);
@@ -51,11 +53,12 @@ let run = null;
 const keys = createInput({
   getState: () => run.state,
   onEndRun: () => run.endRun('restart'),
-  onStart: () => run.startRun(),
+  onStart: () => run.startRun(run.state === 'done' ? 'gate' : 'trailhead'), // Enter: drop in, or ride again
 });
 run = createRun({ b, keys, trail, scene, chassis, rider, treeBuckets: forestPlan.treeBuckets, hud, scores, chaseCamera });
-document.getElementById('startBtn').addEventListener('click', () => run.startRun());
-document.getElementById('againBtn').addEventListener('click', () => run.startRun());
+document.getElementById('startBtn').addEventListener('click', () => run.startRun('trailhead'));
+document.getElementById('againBtn').addEventListener('click', () => run.startRun('gate'));
+document.getElementById('trailheadBtn').addEventListener('click', () => run.startRun('trailhead'));
 
 /* ---------- Frame loop ---------- */
 let last = performance.now(), menuTime = 0, crankAngle = 0;

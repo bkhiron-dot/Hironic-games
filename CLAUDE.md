@@ -13,22 +13,23 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 
 ## Commands
 
-- `npm install` then `npm run dev` - local dev server (Vite). v1 is at `/v1.html`, v2 at `/v2.html`.
+- `npm install` then `npm run dev` - local dev server (Vite). The game (v2) is the home page `/`; v1 is at `/v1.html` (`/v2.html` redirects home).
 - `npm test` - physics and jump-range tests (Node's built-in test runner, no extra deps).
 - `npm run build` - production build into `dist/`.
 
 ## Repository layout
 
 - `public/v1.html` - **reference build**: the complete v1 game in one file, exactly as it was when ported from claude.ai. Treat it as the behavioural spec. Do not edit it; copy logic out of it into `src/`.
-- `v2.html` + `src/` - the modular v2 game. `src/main.js` wires it together; each module's header says what it does. `src/trail.js`, `src/jumps.js` and the pure parts of `terrain.js`, `forest.js` and `physics.js` have no DOM, so tests run them in Node.
-- `src/trails/` - one data file per trail (`hardline.js` is the v1 track) and `index.js`, the list of trails. `defineTrail()` in `src/trail.js` checks the data and builds the trail's functions (`ground`, `groundAt`, `pointAt`, `locate`, `halfWidth`, `kickerAt`, ...). Every module is handed the trail it works on; only `main.js` picks one.
+- `index.html` + `src/` - the game (v2, modular). `src/main.js` wires it together; each module's header says what it does. `src/trail.js`, `src/jumps.js` and the pure parts of `terrain.js`, `forest.js` and `physics.js` have no DOM, so tests run them in Node.
+- `src/trails/` - one data file per trail (`flow-monster.js` is the v1 track; Hardline is the name of the game, not a trail) and `index.js`, the list of trails. `defineTrail()` in `src/trail.js` checks the data and builds the trail's functions (`ground`, `groundAt`, `pointAt`, `locate`, `halfWidth`, `kickerAt`, ...). Every module is handed the trail it works on; only `main.js` picks one.
 - `src/path.js` - the centreline as a measured path: distance along it, points square to it, and `locate(x, z)` to find any world point on it.
 - `src/clock.js` - fixed-step physics clock (1/240 s steps, at most 0.1 s of catch-up per frame).
 - `src/jumps.js` - jump kinds (shape, landing flags, declared landing ranges). Trails place jumps by kind and may override numbers.
-- `index.html` - home page linking to v1 and v2.
+- `src/trailhead.js` - `withTrailhead(trail)`: the level, fenced clearing above the trail's start gate, three start gates (green, blue, black; only the ridden trail's is open), the drop-in point, and the ground graded into the hill round it. `main.js` wraps the trail with it.
+- `public/v2.html` - redirect from the old v2 address to the home page.
 - `tools/jump-sim.js` - jump simulator: rides a jump with the game's own physics (`stepRide`, 1/240 s steps) on a straight test trail at -0.2 grade, or on a real trail (`rideJump`). `npm run jumps` prints every jump on every trail.
-- `tests/` - `node:test` tests. `ground.test.js` checks Hardline against v1's own code (read out of `public/v1.html`) away from jumps, and that the ground has no cliffs. `ride.test.js` rides the game's physics over every jump and the whole trail (`tests/helpers/ride.js`).
-- `docs/v2-trailhead-spec.md` - the agreed design for the next version.
+- `tests/` - `node:test` tests. `ground.test.js` checks Flow Monster against v1's own code (read out of `public/v1.html`) away from jumps, and that the ground has no cliffs. `ride.test.js` rides the game's physics over every jump and the whole trail (`tests/helpers/ride.js`). `trailhead.test.js` checks the clearing (level, no cliffs, gates and fence, forest unmoved) and a run from the drop-in to the finish.
+- `docs/v2-trailhead-spec.md` - the agreed design for the trailhead and the three trails.
 
 ## v1 state (what already works)
 
@@ -48,7 +49,7 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 - The centreline is laid out as sideways sine waves of `d`; `src/path.js` measures it. World point for (s, off): `trail.pointAt(s, off)`; height: `trail.ground(s, off)` or `trail.groundAt(x, z)`; back again: `trail.locate(x, z)`. Rider travels toward -z.
 - The hill is a function of world position (`d`) with each jump's drop built in as a terrace. Near the trail the ground is the riding line + dish + berms + banks; from 6 m past the edge it blends into the hill by 20 m, so tight bends can't make cliffs. Bends tighter than about 35 m radius are refused (the detailed ground would fold).
 - Heading `h`: forward vector `(sin h, 0, -cos h)`; right vector `(cos h, 0, sin h)`. Bike `rotation.y = -h`, rotation order `YXZ`.
-- Hardline (`src/trails/hardline.js`): centreline `x = 22 sin(d/45) + 8 sin(d/23 + 1)`, the same shape on the hill as v1; 1200 m straight down, 1297 m to ride. Hill grade -0.2 (11 degrees) with a 7 m sine undulation and a steeper chute 500-580 m down. Jumps at 177, 438, 743, 1037 m; splits at 326, 650, 974, finish 1297 m.
+- Flow Monster (`src/trails/flow-monster.js`, blue; was "Hardline" until step 3): centreline `x = 22 sin(d/45) + 8 sin(d/23 + 1)`, the same shape on the hill as v1; 1200 m straight down, 1297 m to ride. Hill grade -0.2 (11 degrees) with a 7 m sine undulation and a steeper chute 500-580 m down. Jumps at 177, 438, 743, 1037 m; splits at 326, 650, 974, finish 1297 m.
 
 ## Tuned physics (keep these unless Ben agrees a change)
 
@@ -82,9 +83,9 @@ Jump shapes and their declared landing ranges live in `src/jumps.js` and are che
 |---|---|---|
 | Normal (177 m, 743 m) | 46-68 no pop, 34-52 pop | lip 1.1 m, gap 6 m. Too fast: small crash at 76, big crash from 78 km/h |
 | Big, pop optional (438 m) | 52-66 no pop, 46-54 pop | lip 1.5 m, gap 8.5 m (was 9; tuning round 2), 42 m landing |
-| Big, needs pop, kind `bigPop` (1037 m) | 54-66 pop; no pop cases | Shaped with Ben (tuning rounds 2-4): kicker 12 m, lip 1.8 m, gap 12 m, knuckle 2.4 m, landing 48 m at pitch 0.7. Sweet spot 12.3-30.1 m past the lip. Round 3's 2.2 m lip overshot with a pop at speed; this one is built for a fast pop (lip reachable at about 62 on Hardline) |
+| Big, needs pop, kind `bigPop` (1037 m) | 54-66 pop; no pop cases | Shaped with Ben (tuning rounds 2-4): kicker 12 m, lip 1.8 m, gap 12 m, knuckle 2.4 m, landing 48 m at pitch 0.7. Sweet spot 12.3-30.1 m past the lip. Round 3's 2.2 m lip overshot with a pop at speed; this one is built for a fast pop (lip reachable at about 62 on Flow Monster) |
 
-Fastest reachable lip speed on Hardline (flat out, 300 m run-up, steering only): 177 m about 70, 438 m about 56, 743 m about 77, 1037 m about 63 km/h. So the "pop optional" jump lands without a pop at 52-56 km/h on Hardline.
+Fastest reachable lip speed on Flow Monster (flat out, 300 m run-up, steering only, scripted rider): 177 m about 70, 438 m about 56, 743 m about 77, 1037 m about 63 km/h. So the "pop optional" jump lands without a pop at 52-56 km/h on Flow Monster. These are conservative: Ben has reached the last lip at 66 km/h (scripted rider about 61-63), so leave headroom above them when shaping a jump.
 
 Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diagonal) was ridden 15.5% long and landed smooth at about 53-79 km/h instead of 46-68. With `s` along the path it now lands smooth from 46 km/h in the game.
 
@@ -94,11 +95,12 @@ Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diago
 - `InstancedMesh` needs `frustumCulled = false` (r128 culls on the base geometry's bounds); visibility is managed by distance chunks instead.
 - Hex colours are used as-is (no sRGB output encoding). On three 0.160 this needs `ColorManagement.enabled = false` (in `src/three.js`, which every module imports Three.js through) and `renderer.outputColorSpace = LinearSRGBColorSpace`.
 - Light intensities are v1's values x pi. Since r155 Three.js lights scenes pi times dimmer for the same number; for hemisphere and directional lights x pi is exactly r128's look. Don't use the deprecated `useLegacyLights` instead (warns every load, removed in r165).
-- Terrain colour noise, forest and mountains share one seeded random sequence in that order; changing it moves every tree.
+- Terrain colour noise, forest and mountains share one seeded random sequence in that order; changing it moves every tree. So the trailhead adds things with their own sequences (strip rows above s = -20 use seed + 2, gums round the clearing seed + 1), and a plant whose spot is on the clearing is still worked out, using its random numbers, then thrown away.
 - The forest floor colour is a smooth pattern of world position (`makeGroundNoise`), shared by the detailed strip and the hillside grid so their join doesn't show.
 - **Physics runs in fixed 1/240 s steps** (`src/clock.js`, tuning round PR 1). Before that it stepped once per frame and jump ranges moved by up to 6 km/h between 30 and 120 fps. 240/s is settled: 480/s moves one range edge by 2 km/h. A step costs about 11 µs. Below 10 fps the game runs slower than real time (catch-up is capped at 0.1 s per frame).
 - **The jump simulator rides the game's own physics** (tuning round 2). The old separate simulator had no air drag and popped exactly at the lip, so its ranges were up to 6 km/h off. Declared ranges must come from it, and must be reachable on the trail: check the fastest lip speed (table above) before shaping a jump. A higher lip or lower knuckle needs a steeper landing, or riders land too hard.
-- **The bike can't steer in the air**, so on a jump on a bend it flies straight while the trail curves away. Hardline's last jump (1037 m) is on a 145 m bend on the narrowest part of the trail (half width 2.3 m): ridden straight up the kicker it lands about 1.8 m off-centre. Riders (and `tests/helpers/ride.js`) aim the take-off at the landing.
+- **The bike can't steer in the air**, so on a jump on a bend it flies straight while the trail curves away. Flow Monster's last jump (1037 m) is on a 145 m bend on the narrowest part of the trail (half width 2.3 m): ridden straight up the kicker it lands about 1.8 m off-centre. Riders (and `tests/helpers/ride.js`) aim the take-off at the landing.
+- **The trailhead clearing is cut into a valley**: the trail runs between banks that rise up to 20 m within 25 m of it, so a level 50 x 36 m pad with a smooth blend made cliffs (1.5 m per 0.5 m). The ground round it is graded instead: it may rise above or fall below the pad no faster than 0.7 (35 degrees, easing in over 6 m), and is the plain hill wherever that's gentler. Steepest step round it: 0.35 m per 0.5 m (limit 0.5). Past the gate the trail itself is untouched from 2 m on.
 - The game must keep working at phone width with touch controls; no `alert`/`prompt`; text input must not trigger game keys.
 - The v1 shared scoreboard used the claude.ai artifact database (`window.claude.use('db')`). That does not exist outside claude.ai. v2 uses localStorage behind a small storage interface so a shared backend can be added later.
 
@@ -106,14 +108,14 @@ Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diago
 
 1. **Scaffold** (done): Vite + `three` from npm. Split v1 into ES modules (`terrain`, `trail`, `forest`, `bike`, `rider`, `physics`, `camera`, `hud`, `input`, `scores`, `main`). Behaviour must match `public/v1.html`. Tests pass.
 2. **Trail as data**:
-   - **2a** (done): `defineTrail()` + `src/trails/hardline.js`; every module is handed its trail; still matches v1 exactly. Berms are automatic per trail, with `berms.adjust` for a stretch. Jump simulator keeps a constant -0.2 grade (agreed; real profile moves ranges by 1 km/h at most).
-   - **2b** (done): `s` follows the winding path. Hardline keeps v1's shape on the hill (1297 m to ride). World-space hill with jump terraces; detailed ground strip plus hillside grid; forest regrown along the path. v1 step-for-step tests retired; replaced by ground tests (v1 riding line away from jumps, no cliffs, no trees on the trail) and game-physics ride tests (every jump, and a full run).
-   - **Tuning round**: PR 1 (done) fixed 1/240 s physics step. PR 2: the simulator uses the game's own physics; last jump reshaped (option A, Ben to playtest); normal jumps re-baselined as measured; pop-optional gap 9 -> 8.5 m to restore its ranges. PR 3: Ben's playtest notes.
-3. **Trailhead**: see spec. Three start gates; riding through one selects that trail.
-4. **Jolly Green Giant** (green): rollers + pump mechanic.
-5. **Flow Monster** (blue): linked berms + tabletops.
-6. **Back in Black** (black): freeride, A/B lines.
-7. **Scores**: top 10 per trail per split, fresh start (no v1 scores carried over).
-8. **Hosting**: GitHub Pages (or similar) so the boys can play on phones; then consider a shared score backend.
+   - **2a** (done): `defineTrail()` + `src/trails/hardline.js` (now `flow-monster.js`); every module is handed its trail; still matches v1 exactly. Berms are automatic per trail, with `berms.adjust` for a stretch. Jump simulator keeps a constant -0.2 grade (agreed; real profile moves ranges by 1 km/h at most).
+   - **2b** (done): `s` follows the winding path. The trail keeps v1's shape on the hill (1297 m to ride). World-space hill with jump terraces; detailed ground strip plus hillside grid; forest regrown along the path. v1 step-for-step tests retired; replaced by ground tests (v1 riding line away from jumps, no cliffs, no trees on the trail) and game-physics ride tests (every jump, and a full run).
+   - **Tuning round** (done): PR 1 fixed 1/240 s physics step. PR 2: the simulator uses the game's own physics; normal jumps re-baselined as measured; pop-optional gap 9 -> 8.5 m to restore its ranges. Rounds 3-4 (done): last jump rebuilt for a fast pop after Ben's playtests (lip 66 km/h with a pop: smooth).
+3. **Trailhead** (this step): the trail is renamed Flow Monster (blue). Level fenced clearing at the top; three gates, only blue open (green and black taped off, "coming soon"); map board drawn from the trail data. Drop in at rest in the clearing; the clock starts at the blue gate. End screen: **Ride again** (from the gate) or **Trailhead**. The game is the home page. One trail at a time (layout B, agreed).
+   - **3b**: Flow Monster's berms higher and steeper, jumps unchanged (numbers to agree with Ben first).
+4. **Jolly Green Giant** (green): chill, optional jump rollers, progressing to moderate jumps by the bottom (like Flow Monster's first jumps); pump mechanic (kept, see spec).
+5. **Back in Black** (black): all mandatory gaps: a range of gaps, step-downs and step-ups. No B lines. New jump kinds declare landing ranges checked against reachable lip speeds.
+6. **Scores**: top 10 per trail per split, with trail tabs, fresh start (no v1 scores carried over).
+7. **Hosting** (done for the game: GitHub Pages on every push to main); then consider a shared score backend.
 
 Every new jump or roller feature must declare its expected landing ranges (`landings` in `src/jumps.js`, or on the trail feature if it changes the shape); `tests/jumps.test.js` checks them all.

@@ -33,8 +33,13 @@ export function createBikeState() {
 // Put the bike on the trail's centreline at distance s, facing down the trail.
 export function placeBikeAt(b, trail, s, speed) {
   const p = trail.pointAt(s);
+  placeBikeAtPoint(b, trail, p.x, p.z, trail.headingAt(s), speed);
+}
+
+// Put the bike at world point (x, z) with heading h (e.g. in the trailhead clearing).
+export function placeBikeAtPoint(b, trail, x, z, h, speed) {
   Object.assign(b, {
-    x: p.x, z: p.z, s, y: trail.ground(s, 0), h: trail.headingAt(s), v: speed, vy: 0,
+    x, z, s: trail.locate(x, z).s, y: trail.groundAt(x, z), h, v: speed, vy: 0,
     lean: 0, air: false, pitch: 0, airT: 0, susX: 0, susV: 0, compress: 0, steerIn: 0,
     drift: 0, slide: 0, slipV: 0, slideMem: 0, caught: false,
   });
@@ -82,7 +87,7 @@ export function stepRide(b, keys, trail, treeBuckets, timing, dt) {
 
 // Forward acceleration from slope, pedalling, braking, rolling resistance and drag.
 function alongTrackAccel(b, keys, trail, s, off) {
-  const { groundAt, halfWidth } = trail;
+  const { groundAt } = trail;
   if (b.air) return -0.003 * b.v * b.v; // only air drag
   const f = forward(b.h);
   const gy = groundAt(b.x, b.z), gAhead = groundAt(b.x + f[0] * 0.6, b.z + f[1] * 0.6);
@@ -90,7 +95,7 @@ function alongTrackAccel(b, keys, trail, s, off) {
   let a = -G * slope / Math.sqrt(1 + slope * slope);
   if (keys.pedal) a += 3.0 * clamp((13 - b.v) / 5, 0, 1); // pedalling fades out between 8 and 13 m/s
   if (keys.brake && b.v > 0.1) a -= 8;
-  const offTrail = Math.abs(off) > halfWidth(s) + 0.3;
+  const offTrail = !trail.onTrail(s, off, b.x, b.z);
   a -= (offTrail ? 1.8 : 0.12) + 0.0045 * b.v * b.v;
   return a;
 }
@@ -110,7 +115,7 @@ function steer(b, keys, dt) {
 
 // Cornering: lean asks for sideways grip; tyres and berms decide how much you get.
 function corner(b, trail, s, off, dt, toast) {
-  const { groundAt, halfWidth } = trail;
+  const { groundAt } = trail;
   b.slide = 0; b.grip = 0;
   const rx = Math.cos(b.h), rz = Math.sin(b.h); // rider's right, flat
   if (b.air) {
@@ -120,7 +125,7 @@ function corner(b, trail, s, off, dt, toast) {
     // toward the outside of the turn adds support: aMax = g(mu + tan b)/(1 - mu tan b).
     const aDemand = G * Math.tan(b.lean), turn = Math.sign(aDemand) || 1;
     const gRight = groundAt(b.x + rx * 0.5, b.z + rz * 0.5), gLeft = groundAt(b.x - rx * 0.5, b.z - rz * 0.5);
-    const mu = Math.abs(off) <= halfWidth(s) + 0.3 ? 0.75 : 0.5;
+    const mu = trail.onTrail(s, off, b.x, b.z) ? 0.75 : 0.5;
     const tanBank = clamp(turn * (gLeft - gRight), -0.6, 1 / mu - 0.15);
     const aMax = G * (mu + tanBank) / (1 - mu * tanBank);
     b.grip = Math.abs(aDemand) / aMax;
