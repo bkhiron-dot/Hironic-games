@@ -21,14 +21,17 @@ export const JUMP_KINDS = {
     landings: [
       { pop: 0, from: 46, to: 68, outcome: 'smooth' },
       { pop: 0, from: 36, to: 36, outcome: 'big crash' }, // far too slow: cased
-      { pop: 0, from: 76, to: 76, outcome: 'big crash' }, // far too fast: flat landing
+      { pop: 0, from: 76, to: 76, outcome: 'small crash' }, // too fast: flat landing...
+      { pop: 0, from: 78, to: 80, outcome: 'big crash' },   // ...and faster still
     ],
   },
   // Big jump that clears without a pop (smooth at about 52-66 km/h);
   // a full pop helps if you're slow (smooth at about 46-54 km/h).
+  // Gap 8.5 m (was 9; tuning round 2) so the pop really is optional at the speeds riders reach
+  // (on Hardline, at most about 56 km/h at the lip). Flags are where the game's landings touch down.
   popOptional: {
-    big: true, popOptional: true, kick: 10, lip: 1.5, gap: 9, hole: -1.2, knuck: 1.2, pitch: 0.55, land: 42,
-    short: 8.6, sweet0: 9.2, sweet1: 26, long: 30,
+    big: true, popOptional: true, kick: 10, lip: 1.5, gap: 8.5, hole: -1.2, knuck: 1.2, pitch: 0.55, land: 42,
+    short: 7.8, sweet0: 8.6, sweet1: 23.5, long: 28.5,
     landings: [
       { pop: 0, from: 52, to: 66, outcome: 'smooth' },
       { pop: 3, from: 46, to: 54, outcome: 'smooth' },
