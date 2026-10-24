@@ -5,7 +5,7 @@ import { makeRandom } from '../../src/util.js';
 import { terrainData } from '../../src/terrain.js';
 import { planForest } from '../../src/forest.js';
 import { createBikeState, placeBikeAt, stepRide } from '../../src/physics.js';
-import { classify } from '../../tools/jump-sim.js';
+import { classify, rideJump as rideJumpOn } from '../../tools/jump-sim.js';
 import { PHYSICS_STEP } from '../../src/clock.js';
 
 export { T };
@@ -36,44 +36,11 @@ function rideLine(b, keys, kicker) {
   steerAlongTrail(b, keys);
 }
 
-// Ride one jump: start before the kicker so the bike reaches the lip at `lipKmh`, no pedalling
-// or braking on the kicker, and (if `pop`) crouch up the kicker and release on the last step
-// before the lip, which is the best pop a rider can do (the simulator pops right at the lip).
-// Returns { lipKmh, outcome } where outcome is classify(use) at landing, or the crash.
+// Ride one jump on Hardline so the bike reaches the lip at lipKmh, aiming the kicker at the
+// landing like a rider (the simulator's rider, tools/jump-sim.js). Returns { lipKmh, outcome, ... }.
 export function rideJump(j, lipKmh, pop) {
-  let startV = lipKmh / 3.6, result = null;
-  for (let attempt = 0; attempt < 8; attempt++) {
-    result = rideOnce(j, startV, pop);
-    if (result.lipKmh === null) { startV *= 0.95; continue; } // came off before the lip: ease off
-    const miss = lipKmh - result.lipKmh;
-    if (Math.abs(miss) < 0.15) break;
-    startV += miss / 3.6;
-  }
-  return result;
+  return rideJumpOn(T, j, lipKmh, pop, (keys, b, kicker) => rideLine(b, keys, kicker));
 }
-function rideOnce(j, startV, pop) {
-  const b = createBikeState(), keys = { left: false, right: false, pedal: false, brake: false, hop: false };
-  placeBikeAt(b, T, j.s - j.kick - 12, startV);
-  // already moving: start following the slope, rather than dropped onto it
-  const ahead = T.pointAt(b.s + 0.6);
-  b.vy = (T.groundAt(ahead.x, ahead.z) - b.y) / 0.6 * startV;
-  let lipKmh = null;
-  for (let step = 0; step < 10 / DT; step++) {
-    // like a rider: aim the kicker at the landing, hands off in the air
-    const k = T.kickerAt(b.s);
-    rideLine(b, keys, k);
-    keys.hop = !!(pop && k && k.u < -b.v * DT); // let go on the step that reaches the lip
-    const before = b.s, speed = b.v;
-    const events = stepRide(b, keys, T, treeBuckets, true, DT);
-    if (lipKmh === null && before < j.s && b.s >= j.s) lipKmh = speed * 3.6;
-    const crash = events.find(e => e.type === 'crash');
-    if (crash) return { lipKmh, outcome: crash.big ? 'big crash' : 'small crash', why: crash.reason };
-    const landing = events.find(e => e.type === 'landing');
-    if (landing && b.s > j.s) return { lipKmh, outcome: classify(landing.use) };
-  }
-  return { lipKmh, outcome: 'rolled' };
-}
-
 
 // A whole run from the start: hold a sensible speed for each section (below 58 km/h between
 // jumps, mid-range at each lip, popping where the jump needs it) and steer along the trail.
