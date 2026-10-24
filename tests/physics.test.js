@@ -5,14 +5,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeRandom } from '../src/util.js';
-import { TRACK_SEED, cx, kickerAt } from '../src/trail.js';
+import { HARDLINE } from '../src/trails/index.js';
 import { terrainData } from '../src/terrain.js';
 import { planForest } from '../src/forest.js';
 import { createBikeState, placeBikeAt, stepRide } from '../src/physics.js';
 
-const random = makeRandom(TRACK_SEED);
-terrainData(random);
-const { treeBuckets } = planForest(random); // tests/forest.test.js shows these match v1's trees
+const { cx, kickerAt } = HARDLINE;
+const random = makeRandom(HARDLINE.seed);
+terrainData(HARDLINE, random);
+const { treeBuckets } = planForest(HARDLINE, random); // tests/forest.test.js shows these match v1's trees
 
 const section = (html, from, to) => {
   const a = html.indexOf(from), b = html.indexOf(to, a);
@@ -69,7 +70,7 @@ function rideBoth(plan) {
   const v1 = loadV1Physics();
   const b = createBikeState(), keys = { left: false, right: false, pedal: false, brake: false, hop: false };
   v1.placeAt(plan.start, plan.speed);
-  placeBikeAt(b, plan.start, plan.speed);
+  placeBikeAt(b, HARDLINE, plan.start, plan.speed);
   if (plan.aimAtTree) {
     // point both bikes straight at the nearest gum ahead, off the left side of the trail
     const tree = Object.values(treeBuckets).flat()
@@ -85,7 +86,7 @@ function rideBoth(plan) {
     const timing = v1.timing;
     v1.events.length = 0; v1.shake = 0;
     v1.stepRide(dt);
-    const events = stepRide(b, keys, treeBuckets, timing, dt);
+    const events = stepRide(b, keys, HARDLINE, treeBuckets, timing, dt);
     for (const f of FIELDS) assert.equal(b[f], v1.b[f], `${plan.name}: ${f} differs at step ${step} (s = ${(-b.z).toFixed(1)} m)`);
     // v1 also shows split times from inside the physics step; v2 does that in run.js
     const v1Events = v1.events.filter(e => !(e.type === 'toast' && e.text.startsWith('Split')));

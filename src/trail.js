@@ -1,120 +1,233 @@
-// The v1 track as plain maths: centreline, width, jumps, berms and timing splits.
-// No Three.js here, so the tests can run it in Node.
+// defineTrail() turns trail data (see src/trails/hardline.js) into the functions the game
+// uses: where the centreline is, how wide the trail is, how high the ground is, and what's
+// on it. It checks the data first and explains any mistake in plain words.
+// Plain maths only (no Three.js), so tests can run it in Node.
 //
-// Conventions: s = distance down the track (m), off = sideways offset from the
-// centreline (m, +x side positive). See CLAUDE.md "Coordinate and track conventions".
+// Conventions: s = distance down the trail (m), off = sideways offset from the centreline
+// (m, +x side positive). For now s is measured straight down the hill (world z = -s);
+// roadmap step 2b changes it to follow the winding path. See CLAUDE.md.
 import { clamp, smoothstep } from './util.js';
+import { resolveJump, jumpProfile, SHAPE_KEYS } from './jumps.js';
 
-export const TRACK_LENGTH = 1200;
-export const SPLITS = [300, 600, 900, 1200];             // timing gates; the last one is the finish
-export const ROCKY_SECTIONS = [[230, 290], [760, 830]];  // extra rocks beside the trail here
-export const TRACK_SEED = 20261024;                      // seed for terrain colour noise, forest and mountains
+export const SPLIT_COUNT = 4; // 3 splits + the finish: one high-score board each
 
-// Centreline x position, and its first and second derivatives (for heading and curvature).
-export const cx = s => 22 * Math.sin(s / 45) + 8 * Math.sin(s / 23 + 1);
-export const cxd = s => 22 / 45 * Math.cos(s / 45) + 8 / 23 * Math.cos(s / 23 + 1);
-export const cxdd = s => -22 / 2025 * Math.sin(s / 45) - 8 / 529 * Math.sin(s / 23 + 1);
+// Shape of the ground beside the trail (the same on every trail for now).
+const DISH_DEPTH = 0.1;          // the trail is worn into a shallow dish this deep (m)
+const BERM_FADE_BEFORE_JUMP = 20; // berms fade out from this far before a kicker (m)...
+const BERM_FADE_LENGTH = 8;       // ...over this distance, and back in after the landing
+const BERM_ADJUST_FADE = 5;       // a berm adjustment blends in and out over this distance (m)
 
-// Half the trail width (m). Wanders between 2.3 and 5.4 m.
-export const halfWidth = s => clamp(3.4 + 1.4 * Math.sin(s / 63 + 0.5) + 0.7 * Math.sin(s / 19), 2.3, 5.4);
-
-// Signed curvature of the centreline (1/m), using the proper formula cx'' / (1 + cx'^2)^1.5.
-export function curvature(s) {
-  const d = cxd(s);
-  return cxdd(s) / Math.pow(1 + d * d, 1.5);
+// A list of sine waves { amp, period, phase }: the sum of amp * sin(s / period + phase).
+// Returns the sum and its first and second derivatives.
+function sineWaves(list) {
+  const ws = list.map(w => ({ amp: w.amp, period: w.period, phase: w.phase || 0 }));
+  return {
+    at(s) { let v = 0; for (const w of ws) v += w.amp * Math.sin(s / w.period + w.phase); return v; },
+    slope(s) { let v = 0; for (const w of ws) v += w.amp / w.period * Math.cos(s / w.period + w.phase); return v; },
+    bend(s) { let v = 0; for (const w of ws) v += -w.amp / (w.period * w.period) * Math.sin(s / w.period + w.phase); return v; },
+  };
 }
 
-/* ---------- Jumps ----------
-   Profile measured from the lip (u = 0): kicker -> gap with a hole -> face up to the
-   knuckle at u = gap -> landing that rolls over (first 20%), holds a steep pitch (to 50%),
-   then eases back to trail grade. The run-out continues at the new, lower level.
-   short / sweet0 / sweet1 / long are where the amber and green landing flags stand.
-   Landing ranges are pinned by tests (see tools/jump-sim.js). */
-const HOLE_LENGTH = 1.5, LANDING_LENGTH = 30, ROLLOVER_END = 0.2, PITCH_END = 0.5;
+export function defineTrail(data) {
+  checkTrail(data);
+  const { length, splits, start } = data;
+  const centre = sineWaves(data.centreline);
+  const widthWaves = data.width.waves.map(w => ({ amp: w.amp, period: w.period, phase: w.phase || 0 }));
+  const profileWaves = (data.profile.waves || []).map(w => ({ amp: w.amp, period: w.period, phase: w.phase || 0 }));
+  const chutes = data.profile.chutes || [];
+  const jumps = data.features.filter(f => f.type === 'jump').map(resolveJump).sort((a, b) => a.s - b.s);
+  const berms = { auto: true, adjust: [], ...data.berms };
+  const bermRamp = berms.fullCurvature - berms.startCurvature;
 
-// Normal jump: lands smooth at about 46-68 km/h at the lip without a pop.
-const normalJump = s => ({ s, big: false, kick: 9, lip: 1.1, gap: 6, hole: -1.0, knuck: 1.0, pitch: 0.3,
-  short: 5.3, sweet0: 5.6, sweet1: 20, long: 23 });
+  // Centreline x position, and its first and second derivatives (for heading and curvature).
+  const cx = centre.at, cxd = centre.slope, cxdd = centre.bend;
 
-// Big jump after split 1: clears without a pop (smooth at about 52-66 km/h);
-// a full pop helps if you're slow (smooth at about 46-54 km/h).
-const popOptionalJump = s => ({ s, big: true, popOptional: true, kick: 10, lip: 1.5, gap: 9, hole: -1.2, knuck: 1.2,
-  pitch: 0.55, land: 42, short: 8.6, sweet0: 9.2, sweet1: 26, long: 30 });
-
-// Big jump that needs a pop: full pop lands smooth at about 52-64 km/h; without one you case it.
-const bigPopJump = s => ({ s, big: true, kick: 10, lip: 1.5, gap: 12, hole: -1.2, knuck: 2.4, pitch: 0.4,
-  short: 10.6, sweet0: 11.8, sweet1: 24.5, long: 28 });
-
-// Landing height relative to the knuckle, for t = 0..1 along the landing, defined by its slope.
-export function landingShape(t, pitch) {
-  if (t < ROLLOVER_END) return -pitch * t * t / (2 * ROLLOVER_END);
-  if (t < PITCH_END) return -pitch * ROLLOVER_END / 2 - pitch * (t - ROLLOVER_END);
-  const q = t - PITCH_END;
-  return -pitch * ROLLOVER_END / 2 - pitch * (PITCH_END - ROLLOVER_END) - pitch * (q - q * q / (2 * (1 - PITCH_END)));
-}
-
-export const JUMPS = [normalJump(170), popOptionalJump(410), normalJump(690), bigPopJump(960)];
-for (const j of JUMPS) {
-  j.land = j.land || LANDING_LENGTH;
-  j.drop = -landingShape(1, j.pitch) * j.land; // how much lower the trail is after the jump
-  j.end = j.s + j.gap + j.land;
-}
-
-// Extra height the jumps add at distance s.
-export function jumpHeight(s) {
-  let h = 0;
-  for (const j of JUMPS) {
-    const u = s - j.s;
-    if (u <= -j.kick) continue;
-    if (u < 0) { const t = (u + j.kick) / j.kick; h += j.lip * t * t; }
-    else if (u < HOLE_LENGTH) h += j.hole;
-    else if (u < j.gap) h += j.hole + (j.knuck - j.hole) * smoothstep((u - HOLE_LENGTH) / (j.gap - HOLE_LENGTH));
-    else if (u < j.gap + j.land) h += j.knuck + j.land * landingShape((u - j.gap) / j.land, j.pitch);
-    else h += j.knuck - j.drop;
+  // Half the trail width (m).
+  function halfWidth(s) {
+    let h = data.width.base;
+    for (const w of widthWaves) h += w.amp * Math.sin(s / w.period + w.phase);
+    return clamp(h, data.width.min, data.width.max);
   }
-  return h;
-}
 
-// If s is on a kicker, returns the jump and u (metres before the lip, negative). Otherwise null.
-export function kickerAt(s) {
-  for (const j of JUMPS) {
-    const u = s - j.s;
-    if (u > -j.kick && u < 0) return { j, u };
+  // Signed curvature of the centreline (1/m), using the proper formula cx'' / (1 + cx'^2)^1.5.
+  function curvature(s) {
+    const d = cxd(s);
+    return cxdd(s) / Math.pow(1 + d * d, 1.5);
   }
-  return null;
-}
 
-// Which part of a jump the point s is on: gap, knuckle, sweet, bottom, flat, or null.
-export function jumpZone(s) {
-  for (const j of JUMPS) {
-    const u = s - j.s;
-    if (u >= 0 && u < j.short) return 'gap';
-    if (u >= j.short && u < j.sweet0) return 'knuckle';
-    if (u >= j.sweet0 && u <= j.sweet1) return 'sweet';
-    if (u > j.sweet1 && u <= j.long) return 'bottom';
-    if (u > j.long && u < j.gap + j.land + 25) return 'flat';
+  // Height of the trail's centreline before jumps and berms: steady grade, gentle waves, chutes.
+  function profileHeight(s) {
+    let h = data.profile.grade * s;
+    for (const w of profileWaves) h += w.amp * Math.sin(s / w.period + w.phase);
+    for (const c of chutes) h += c.grade * clamp(s - c.from, 0, c.to - c.from);
+    return h;
   }
-  return null;
-}
 
-/* ---------- Berms ----------
-   On tight corners the outside of the trail curves up like a wall (up to 1.7 m at the edge).
-   The higher you ride on it, the more it holds you in. Faded out around jumps. */
-export function bermAmount(s) {
-  let b = smoothstep((Math.abs(curvature(s)) - 0.010) / 0.010) * 1.7;
-  for (const j of JUMPS) {
-    const d = Math.max((j.s - j.kick - 20) - s, s - j.end);
-    if (d < 8) b *= smoothstep(d / 8);
+  function jumpHeight(s) {
+    let h = 0;
+    for (const j of jumps) h += jumpProfile(j, s - j.s);
+    return h;
   }
-  return b;
+
+  // If s is on a kicker, returns the jump and u (metres before the lip, negative). Otherwise null.
+  function kickerAt(s) {
+    for (const j of jumps) {
+      const u = s - j.s;
+      if (u > -j.kick && u < 0) return { j, u };
+    }
+    return null;
+  }
+
+  // Which part of a jump the point s is on: gap, knuckle, sweet, bottom, flat, or null.
+  function jumpZone(s) {
+    for (const j of jumps) {
+      const u = s - j.s;
+      if (u >= 0 && u < j.short) return 'gap';
+      if (u >= j.short && u < j.sweet0) return 'knuckle';
+      if (u >= j.sweet0 && u <= j.sweet1) return 'sweet';
+      if (u > j.sweet1 && u <= j.long) return 'bottom';
+      if (u > j.long && u < j.gap + j.land + 25) return 'flat';
+    }
+    return null;
+  }
+
+  // Berm wall height at the trail edge here, after any adjustments for this stretch.
+  function bermWallHeight(s) {
+    let h = berms.height;
+    for (const a of berms.adjust) {
+      if (s <= a.from - BERM_ADJUST_FADE || s >= a.to + BERM_ADJUST_FADE) continue;
+      const t = smoothstep((s - a.from + BERM_ADJUST_FADE) / BERM_ADJUST_FADE) * smoothstep((a.to + BERM_ADJUST_FADE - s) / BERM_ADJUST_FADE);
+      h += (a.height - h) * t;
+    }
+    return h;
+  }
+
+  /* Berms: on tight corners the outside of the trail curves up like a wall. They are built
+     automatically from how sharply the trail bends; the higher you ride on one, the more it
+     holds you in. Faded out around jumps. */
+  function bermAmount(s) {
+    if (!berms.auto) return 0;
+    let b = smoothstep((Math.abs(curvature(s)) - berms.startCurvature) / bermRamp) * bermWallHeight(s);
+    for (const j of jumps) {
+      const d = Math.max((j.s - j.kick - BERM_FADE_BEFORE_JUMP) - s, s - j.end);
+      if (d < BERM_FADE_LENGTH) b *= smoothstep(d / BERM_FADE_LENGTH);
+    }
+    return b;
+  }
+
+  // Berm height at (s, off), given the half width w there.
+  function bermHeight(s, off, w) {
+    const b = bermAmount(s);
+    if (b <= 0.01) return 0;
+    const outside = off * -Math.sign(curvature(s)); // how far toward the outside of the turn
+    if (outside <= 0) return 0;
+    if (outside <= w) { const t = outside / w; return b * t * t; }
+    return b * (1 - 0.6 * smoothstep((outside - w) / 2.5));
+  }
+
+  // Ground height at distance s down the trail and sideways offset off.
+  function ground(s, off) {
+    let h = profileHeight(s) + jumpHeight(s);
+    const a = Math.abs(off), w = halfWidth(s);
+    h += bermHeight(s, off, w);
+    if (a > w) {
+      // off the trail the hillside rises away, with gentle lumps
+      const e = a - w;
+      h += Math.pow(e, 1.25) * 0.18 + 0.25 * Math.sin(s * 0.31 + off * 0.7) * Math.min(1, e / 2);
+    } else {
+      h -= DISH_DEPTH * (1 - (a / w) * (a / w));
+    }
+    return h;
+  }
+
+  // Same as ground(), from world x and z.
+  const groundAt = (x, z) => {
+    const s = -z;
+    return ground(s, x - cx(s));
+  };
+
+  return {
+    id: data.id, name: data.name, length, seed: data.seed, splits, start,
+    scenery: { rocky: [], ...data.scenery }, jumps, berms,
+    cx, cxd, cxdd, curvature, halfWidth, profileHeight, jumpHeight, kickerAt, jumpZone,
+    bermAmount, bermHeight, ground, groundAt,
+  };
 }
 
-// Berm height at (s, off), given the half width w there.
-export function bermHeight(s, off, w) {
-  const b = bermAmount(s);
-  if (b <= 0.01) return 0;
-  const outside = off * -Math.sign(curvature(s)); // how far toward the outside of the turn
-  if (outside <= 0) return 0;
-  if (outside <= w) { const t = outside / w; return b * t * t; }
-  return b * (1 - 0.6 * smoothstep((outside - w) / 2.5));
+/* ---------- Checking trail data ----------
+   Mistakes in a trail file stop the game with a message saying what to fix,
+   rather than giving a strange track. */
+function checkTrail(data) {
+  const name = data && data.id ? `Trail "${data.id}"` : 'Trail';
+  const fail = message => { throw new Error(`${name}: ${message}`); };
+  const isNumber = v => typeof v === 'number' && Number.isFinite(v);
+  const checkWaves = (list, what) => {
+    if (!Array.isArray(list)) fail(`${what} must be a list of waves like { amp: 8, period: 23 }`);
+    list.forEach((w, i) => {
+      if (!isNumber(w.amp) || !isNumber(w.period) || w.period === 0) fail(`${what} wave ${i + 1} needs a number amp and a non-zero period`);
+      if (w.phase !== undefined && !isNumber(w.phase)) fail(`${what} wave ${i + 1}: phase must be a number`);
+    });
+  };
+
+  if (!data || typeof data !== 'object') fail('trail data is missing');
+  if (typeof data.id !== 'string' || !data.id) fail('needs an id, like "hardline"');
+  if (typeof data.name !== 'string' || !data.name) fail('needs a name');
+  if (!isNumber(data.length) || data.length <= 0) fail('length must be a positive number of metres');
+  if (!Number.isInteger(data.seed)) fail('seed must be a whole number');
+  checkWaves(data.centreline, 'centreline');
+
+  const w = data.width || {};
+  if (!isNumber(w.base) || !isNumber(w.min) || !isNumber(w.max)) fail('width needs base, min and max');
+  if (!(w.min > 0 && w.min < w.max)) fail('width min must be above 0 and below max');
+  checkWaves(w.waves || [], 'width');
+
+  const p = data.profile || {};
+  if (!isNumber(p.grade)) fail('profile needs a grade, like -0.2 (downhill)');
+  checkWaves(p.waves || [], 'profile');
+  (p.chutes || []).forEach(c => {
+    if (!isNumber(c.from) || !isNumber(c.to) || !isNumber(c.grade) || c.to <= c.from) fail(`chute needs from < to and a grade (got ${JSON.stringify(c)})`);
+  });
+
+  const st = data.start || {};
+  if (!isNumber(st.spawn) || !isNumber(st.gate) || !(st.spawn >= 0 && st.spawn < st.gate)) fail('start needs spawn and gate, with spawn before the gate');
+
+  const sp = data.splits;
+  if (!Array.isArray(sp) || sp.length !== SPLIT_COUNT) fail(`needs exactly ${SPLIT_COUNT} splits (3 splits and the finish)`);
+  sp.forEach((s, i) => {
+    if (!isNumber(s)) fail(`split ${i + 1} must be a number`);
+    if (s <= (i ? sp[i - 1] : st.gate)) fail(`splits must go down the trail, each after the one before and after the start gate (split ${i + 1} is at ${s})`);
+  });
+  if (sp[sp.length - 1] !== data.length) fail(`the last split is the finish and must be at the trail length (${data.length}), not ${sp[sp.length - 1]}`);
+
+  const b = data.berms || {};
+  if (b.auto !== false) {
+    if (!isNumber(b.startCurvature) || !isNumber(b.fullCurvature) || !(b.startCurvature < b.fullCurvature)) fail('berms need startCurvature below fullCurvature');
+    if (!isNumber(b.height) || b.height < 0) fail('berms need a height of 0 or more');
+  }
+  (b.adjust || []).forEach(a => {
+    if (!isNumber(a.from) || !isNumber(a.to) || a.to <= a.from) fail(`berm adjustment needs from < to (got ${JSON.stringify(a)})`);
+    if (!isNumber(a.height) || a.height < 0) fail(`berm adjustment at ${a.from}-${a.to} needs a height of 0 or more`);
+  });
+
+  ((data.scenery && data.scenery.rocky) || []).forEach(r => {
+    if (!Array.isArray(r) || r.length !== 2 || !(r[0] < r[1])) fail(`rocky sections are [from, to] pairs (got ${JSON.stringify(r)})`);
+  });
+
+  if (!Array.isArray(data.features)) fail('features must be a list (it can be empty)');
+  const jumps = [];
+  for (const f of data.features) {
+    if (f.type !== 'jump') fail(`unknown feature type "${f.type}" (known: jump)`);
+    if (!isNumber(f.at)) fail('every jump needs an "at" distance');
+    let j;
+    try { j = resolveJump(f); } catch (e) { fail(`jump at ${f.at}: ${e.message}`); }
+    const reshaped = SHAPE_KEYS.some(k => k in f);
+    if (reshaped && !f.landings) fail(`jump at ${f.at} changes the jump's shape, so it must declare its own landings (landing ranges)`);
+    if (j.s - j.kick <= st.gate) fail(`jump at ${f.at}: its kicker starts before the start gate`);
+    if (j.end > data.length) fail(`jump at ${f.at}: its landing runs past the end of the trail`);
+    jumps.push(j);
+  }
+  jumps.sort((a, c) => a.s - c.s);
+  for (let i = 1; i < jumps.length; i++) {
+    if (jumps[i].s - jumps[i].kick <= jumps[i - 1].end) fail(`jump at ${jumps[i].s} starts before the landing of the jump at ${jumps[i - 1].s} ends`);
+  }
 }

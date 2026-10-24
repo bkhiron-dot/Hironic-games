@@ -1,7 +1,7 @@
 // Hardline MTB v2: builds the world, wires the parts together and runs the frame loop.
 import './style.css';
 import { makeRandom } from './util.js';
-import { TRACK_SEED } from './trail.js';
+import { HARDLINE } from './trails/index.js';
 import { createScene, buildMountains, followWithSun } from './scene.js';
 import { buildTerrain } from './terrain.js';
 import { planForest, buildForest } from './forest.js';
@@ -29,21 +29,22 @@ const { renderer, scene, camera, sun } = createScene(document.getElementById('ga
 
 // The world, built in v1's order. Terrain colours, forest and mountains share one
 // random sequence, so the order decides where every tree grows.
-const random = makeRandom(TRACK_SEED);
-buildTerrain(scene, renderer, random);
-const forestPlan = planForest(random);
+const trail = HARDLINE;
+const random = makeRandom(trail.seed);
+buildTerrain(scene, renderer, trail, random);
+const forestPlan = planForest(trail, random);
 const forest = buildForest(scene, forestPlan);
-buildMountains(scene, random);
-buildMarkers(scene);
+buildMountains(scene, trail, random);
+buildMarkers(scene, trail);
 
 const kit = createKit();
 const { bike, chassis, cranks } = createBike(scene, kit);
 const { rider, upper, legs } = createRider(chassis, kit);
 const dust = createDust(scene);
 const b = createBikeState();
-const chaseCamera = createChaseCamera(camera, reduceMotion);
+const chaseCamera = createChaseCamera(camera, trail, reduceMotion);
 const scores = createScoreStore(SCORES_KEY);
-const hud = createHud({ scores, coarse });
+const hud = createHud({ scores, trail, coarse });
 
 let run = null;
 const keys = createInput({
@@ -51,7 +52,7 @@ const keys = createInput({
   onEndRun: () => run.endRun('restart'),
   onStart: () => run.startRun(),
 });
-run = createRun({ b, keys, scene, chassis, rider, treeBuckets: forestPlan.treeBuckets, hud, scores, chaseCamera });
+run = createRun({ b, keys, trail, scene, chassis, rider, treeBuckets: forestPlan.treeBuckets, hud, scores, chaseCamera });
 document.getElementById('startBtn').addEventListener('click', () => run.startRun());
 document.getElementById('againBtn').addEventListener('click', () => run.startRun());
 

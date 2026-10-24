@@ -7,8 +7,6 @@
 //   { type: 'shake', amount }        shake the camera (heavy landing)
 //   { type: 'crash', reason, big }   the rider came off; always the last event
 import { clamp } from './util.js';
-import { cx, cxd, halfWidth, kickerAt, jumpZone } from './trail.js';
-import { ground, groundAt } from './terrain.js';
 import { TREE_BUCKET_LENGTH } from './forest.js';
 
 export const G = 9.8;      // gravity on the ground
@@ -30,10 +28,10 @@ export function createBikeState() {
   };
 }
 
-// Put the bike on the centreline at distance s, facing down the trail.
-export function placeBikeAt(b, s, speed) {
+// Put the bike on the trail's centreline at distance s, facing down the trail.
+export function placeBikeAt(b, trail, s, speed) {
   Object.assign(b, {
-    x: cx(s), z: -s, y: ground(s, 0), h: Math.atan2(cxd(s), 1), v: speed, vy: 0,
+    x: trail.cx(s), z: -s, y: trail.ground(s, 0), h: Math.atan2(trail.cxd(s), 1), v: speed, vy: 0,
     lean: 0, air: false, pitch: 0, airT: 0, susX: 0, susV: 0, compress: 0, steerIn: 0,
     drift: 0, slide: 0, slipV: 0, slideMem: 0, caught: false,
   });
@@ -41,17 +39,18 @@ export function placeBikeAt(b, s, speed) {
 
 const forward = h => [Math.sin(h), -Math.cos(h)];
 
-export function stepRide(b, keys, treeBuckets, timing, dt) {
+export function stepRide(b, keys, trail, treeBuckets, timing, dt) {
+  const { groundAt } = trail;
   const events = [];
   const toast = text => events.push({ type: 'toast', text });
   const crash = (reason, big) => { events.push({ type: 'crash', reason, big }); return events; };
 
-  const sNow = -b.z, off = b.x - cx(sNow);
-  b.v = Math.max(0, b.v + alongTrackAccel(b, keys, sNow, off) * dt);
+  const sNow = -b.z, off = b.x - trail.cx(sNow);
+  b.v = Math.max(0, b.v + alongTrackAccel(b, keys, trail, sNow, off) * dt);
   steer(b, keys, dt);
   // The rider's right, taken before cornering turns the bike; sideways slip moves along it.
   const rx = Math.cos(b.h), rz = Math.sin(b.h);
-  corner(b, sNow, off, dt, toast);
+  corner(b, trail, sNow, off, dt, toast);
 
   // move: sideways slip, then forward along the new heading
   b.x += rx * b.slipV * dt; b.z += rz * b.slipV * dt;
@@ -60,9 +59,9 @@ export function stepRide(b, keys, treeBuckets, timing, dt) {
   const gNew = groundAt(b.x, b.z);
   const slopeNew = (groundAt(b.x + f[0] * 0.6, b.z + f[1] * 0.6) - gNew) / 0.6;
 
-  const landing = flyOrFollowGround(b, gNew, slopeNew, dt, events);
+  const landing = flyOrFollowGround(b, trail, gNew, slopeNew, dt, events);
   if (landing) return crash(landing.reason, landing.big);
-  hopAndPop(b, keys, dt, toast);
+  hopAndPop(b, trail, keys, dt, toast);
 
   // stuck (e.g. rolled into a jump hole): after 2.5 s treat it as a small crash and walk it out
   if (timing && !b.air && b.v < 0.4 && !keys.pedal) b.stuckT += dt; else b.stuckT = 0;
@@ -78,7 +77,8 @@ export function stepRide(b, keys, treeBuckets, timing, dt) {
 }
 
 // Forward acceleration from slope, pedalling, braking, rolling resistance and drag.
-function alongTrackAccel(b, keys, s, off) {
+function alongTrackAccel(b, keys, trail, s, off) {
+  const { groundAt, halfWidth } = trail;
   if (b.air) return -0.003 * b.v * b.v; // only air drag
   const f = forward(b.h);
   const gy = groundAt(b.x, b.z), gAhead = groundAt(b.x + f[0] * 0.6, b.z + f[1] * 0.6);
@@ -105,7 +105,8 @@ function steer(b, keys, dt) {
 }
 
 // Cornering: lean asks for sideways grip; tyres and berms decide how much you get.
-function corner(b, s, off, dt, toast) {
+function corner(b, trail, s, off, dt, toast) {
+  const { groundAt, halfWidth } = trail;
   b.slide = 0; b.grip = 0;
   const rx = Math.cos(b.h), rz = Math.sin(b.h); // rider's right, flat
   if (b.air) {
@@ -155,11 +156,11 @@ function corner(b, s, off, dt, toast) {
 
 // In the air: fly and check for a landing. On the ground: follow it, or take off if the
 // ground drops away faster than gravity can pull the bike down. Returns a crash or null.
-function flyOrFollowGround(b, gNew, slopeNew, dt, events) {
+function flyOrFollowGround(b, trail, gNew, slopeNew, dt, events) {
   if (!b.air) {
     const followVy = (gNew - b.y) / dt;
     if (followVy < b.vy - G * dt && followVy < -1.5) {
-      b.fromLip = !!kickerAt(-b.z - 1.5); b.popped = false;
+      b.fromLip = !!trail.kickerAt(-b.z - 1.5); b.popped = false;
       b.air = true; b.airT = 0; b.vy -= G_AIR * dt; b.y += b.vy * dt;
     } else { b.vy = followVy; b.y = gNew; }
     return null;
@@ -176,7 +177,7 @@ function flyOrFollowGround(b, gNew, slopeNew, dt, events) {
   const use = (vi * vi / (2 * 38)) / travel + Math.max(0, Math.abs(b.lean) - 0.4) * 1.2;
   b.y = gNew; b.air = false; b.vy = slopeNew * b.v;
   b.susV += vi * 0.55;
-  const zone = jumpZone(-b.z), big = b.airT > 0.45;
+  const zone = trail.jumpZone(-b.z), big = b.airT > 0.45;
   if (use >= 1.35) return { reason: zone === 'gap' || zone === 'knuckle' ? 'cased the landing' : 'flat landing, suspension bottomed out', big: true };
   if (use >= 1.0) return { reason: 'bottomed out the suspension', big: false };
   if (use >= 0.55) {
@@ -189,11 +190,11 @@ function flyOrFollowGround(b, gNew, slopeNew, dt, events) {
 }
 
 // Space: hold to crouch, release to hop. Released at a jump lip it's a pop.
-function hopAndPop(b, keys, dt, toast) {
+function hopAndPop(b, trail, keys, dt, toast) {
   if (keys.hop && !b.air) { b.compress = Math.min(1, b.compress + dt * 4); return; }
   if (keys.hop || b.compress <= 0) return;
   // Pop: release in the last 4 m of a kicker, or within 0.15 s of leaving the lip, for a big lift.
-  const k = kickerAt(-b.z), c = b.compress;
+  const k = trail.kickerAt(-b.z), c = b.compress;
   const popToast = () => toast(c > 0.8 ? 'Big pop!' : 'Pop (hold Space longer for more)');
   if (!b.air && k && k.u > -4) { b.vy += 1.0 + 2.0 * c; b.air = true; b.airT = 0; b.y += 0.02; b.popped = true; popToast(); }
   else if (b.air && b.airT < 0.15 && b.fromLip && !b.popped) { b.vy += (1.0 + 2.0 * c) * 0.85; b.popped = true; popToast(); }

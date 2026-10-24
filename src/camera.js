@@ -1,9 +1,8 @@
 // Chase camera: follows behind and above the rider, looking ahead down the trail.
 // Slowly circles the bike on the start screen, and watches the rider during a crash.
 import * as THREE from './three.js';
-import { groundAt } from './terrain.js';
 
-export function createChaseCamera(camera, reduceMotion) {
+export function createChaseCamera(camera, trail, reduceMotion) {
   const position = new THREE.Vector3(), lookAt = new THREE.Vector3();
   let shake = 0;
 
@@ -11,7 +10,7 @@ export function createChaseCamera(camera, reduceMotion) {
   function targets(b) {
     const forward = new THREE.Vector3(Math.sin(b.h), 0, -Math.cos(b.h));
     const p = new THREE.Vector3(b.x, b.y, b.z).addScaledVector(forward, -5.2);
-    p.y = Math.max(p.y, groundAt(p.x, p.z)) + 2.4; // never below the ground behind
+    p.y = Math.max(p.y, trail.groundAt(p.x, p.z)) + 2.4; // never below the ground behind
     const l = new THREE.Vector3(b.x, b.y + 0.9, b.z).addScaledVector(forward, 6);
     return [p, l];
   }

@@ -1,6 +1,5 @@
 // Renderer, scene, sky, lights and the distant mountains.
 import * as THREE from './three.js';
-import { TRACK_LENGTH } from './trail.js';
 
 const SKY = 0xc3d3dc;
 
@@ -50,8 +49,8 @@ export function followWithSun(sun, x, y, z) {
   sun.target.position.set(x, y, z);
 }
 
-// Two rows of cone mountains beyond the bottom of the track; the far row has snow caps.
-export function buildMountains(scene, random) {
+// Two rows of cone mountains beyond the bottom of the trail; the far row has snow caps.
+export function buildMountains(scene, trail, random) {
   const far = new THREE.MeshBasicMaterial({ color: 0xa6b6c0, fog: false });
   const near = new THREE.MeshBasicMaterial({ color: 0x7f9199, fog: false });
   const snow = new THREE.MeshBasicMaterial({ color: 0xeef2f4, fog: false });
@@ -67,6 +66,6 @@ export function buildMountains(scene, random) {
       scene.add(cap);
     }
   };
-  for (let i = 0; i < 14; i++) add(-900 + i * 140 + random() * 60, -(TRACK_LENGTH + 650 + random() * 250), -420, 320 + random() * 260, 180 + random() * 90, far, random() < 0.6);
-  for (let i = 0; i < 10; i++) add(-700 + i * 150 + random() * 50, -(TRACK_LENGTH + 380 + random() * 120), -400, 200 + random() * 150, 150 + random() * 70, near, false);
+  for (let i = 0; i < 14; i++) add(-900 + i * 140 + random() * 60, -(trail.length + 650 + random() * 250), -420, 320 + random() * 260, 180 + random() * 90, far, random() < 0.6);
+  for (let i = 0; i < 10; i++) add(-700 + i * 150 + random() * 50, -(trail.length + 380 + random() * 120), -400, 200 + random() * 150, 150 + random() * 70, near, false);
 }

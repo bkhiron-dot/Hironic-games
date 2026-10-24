@@ -20,9 +20,11 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 ## Repository layout
 
 - `public/v1.html` - **reference build**: the complete v1 game in one file, exactly as it was when ported from claude.ai. Treat it as the behavioural spec. Do not edit it; copy logic out of it into `src/`.
-- `v2.html` + `src/` - the modular v2 game. `src/main.js` wires it together; each module's header says what it does. `src/trail.js` and the pure parts of `terrain.js`, `forest.js` and `physics.js` have no DOM, so tests run them in Node.
+- `v2.html` + `src/` - the modular v2 game. `src/main.js` wires it together; each module's header says what it does. `src/trail.js`, `src/jumps.js` and the pure parts of `terrain.js`, `forest.js` and `physics.js` have no DOM, so tests run them in Node.
+- `src/trails/` - one data file per trail (`hardline.js` is the v1 track) and `index.js`, the list of trails. `defineTrail()` in `src/trail.js` checks the data and builds the trail's functions (`ground`, `halfWidth`, `kickerAt`, ...). Every module is handed the trail it works on; only `main.js` picks one.
+- `src/jumps.js` - jump kinds (shape, landing flags, declared landing ranges). Trails place jumps by kind and may override numbers.
 - `index.html` - home page linking to v1 and v2.
-- `tools/jump-sim.js` - straight-line jump simulator shared by tests and tuning.
+- `tools/jump-sim.js` - straight-line jump simulator shared by tests and tuning; reads shapes from `src/jumps.js`. `npm run jumps` prints every jump on every trail.
 - `tests/` - `node:test` tests. `track`, `forest` and `physics` tests read v1's own code out of `public/v1.html` and check v2 gives identical results (physics: every bike value at every step of scripted rides).
 - `docs/v2-trailhead-spec.md` - the agreed design for the next version.
 
@@ -40,11 +42,10 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 
 ## Coordinate and track conventions
 
-- `s` = distance down the track (m), `off` = lateral offset from the centreline (m, +x side positive).
+- `s` = distance down the track (m), `off` = lateral offset from the centreline (m, +x side positive). **For now `s` is measured straight down the hill (world z), not along the winding path** (see Roadmap 2b).
 - World: `x = cx(s) + off`, `z = -s`, `y = ground(s, off)`. Rider travels toward -z.
 - Heading `h`: forward vector `(sin h, 0, -cos h)`; right vector `(cos h, 0, sin h)`. Bike `rotation.y = -h`, rotation order `YXZ`.
-- Centreline `cx(s) = 22 sin(s/45) + 8 sin(s/23 + 1)`; curvature uses the proper formula `cx'' / (1 + cx'^2)^1.5`.
-- Base grade about -0.2 (11 degrees) with a 7 m sine undulation and a steeper chute at 500-580 m.
+- Hardline (`src/trails/hardline.js`): centreline `cx(s) = 22 sin(s/45) + 8 sin(s/23 + 1)`; curvature uses the proper formula `cx'' / (1 + cx'^2)^1.5`. Base grade -0.2 (11 degrees) with a 7 m sine undulation and a steeper chute at 500-580 m.
 
 ## Tuned physics (keep these unless Ben agrees a change)
 
@@ -70,13 +71,15 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 | Tree crash | small below 9 m/s (32 km/h), big at or above | below 2.5 m/s you just stop |
 | Visual suspension spring | k 170, c 18, 0.18 m max | |
 
-Jump profiles live in `tools/jump-sim.js` and are pinned by tests. Current tuned ranges (speed at lip, km/h):
+Jump shapes and their declared landing ranges live in `src/jumps.js` and are checked by `tests/jumps.test.js`. Current tuned ranges (speed at lip, km/h, from the simulator):
 
 | Jump | Smooth | Notes |
 |---|---|---|
 | Normal (170 m, 690 m) | 46-68 no pop | lip 1.1 m, gap 6 m |
 | Big, needs pop (960 m) | 52-64 with full pop | lip 1.5 m, gap 12 m; cases without pop below about 66 |
 | Big, pop optional (410 m) | 52-66 no pop, 46-54 full pop | lip 1.5 m, gap 9 m, 42 m landing |
+
+Known mismatch (fixed by Roadmap 2b): because `s` runs straight down the hill, a jump on a diagonal is ridden longer than designed. The 170 m jump is ridden 15.5% long (7.0 m gap), so in the game it lands smooth at about 53-79 km/h, not 46-68. The other jumps are 1-3% long.
 
 ## Known gotchas (learned the hard way)
 
@@ -91,7 +94,9 @@ Jump profiles live in `tools/jump-sim.js` and are pinned by tests. Current tuned
 ## Roadmap for v2 (do these in order, one PR-sized step each)
 
 1. **Scaffold** (done): Vite + `three` from npm. Split v1 into ES modules (`terrain`, `trail`, `forest`, `bike`, `rider`, `physics`, `camera`, `hud`, `input`, `scores`, `main`). Behaviour must match `public/v1.html`. Tests pass.
-2. **Trail as data**: replace hard-coded globals with a `Trail` definition (centreline, width function, features list: jumps, berms, rollers, splits). v1's track becomes the first `Trail`. Physics and mesh read only from the `Trail`.
+2. **Trail as data**:
+   - **2a** (done): `defineTrail()` + `src/trails/hardline.js`; every module is handed its trail; still matches v1 exactly. Berms are automatic per trail, with `berms.adjust` for a stretch. Jump simulator keeps a constant -0.2 grade (agreed; real profile moves ranges by 1 km/h at most).
+   - **2b** (next, agreed with Ben): `s` follows the winding path (true distance). Needs: a world-space hill so tight bends don't make cliffs (trail height = hill under it + features); terrain as a near-trail ribbon plus a hillside grid; forest regrown along the path; the v1-match tests retired and replaced by geometry tests and a game-vs-simulator jump test. Open decisions: Hardline layout (keep the same shape, 1297 m, recommended; or round numbers) and the hill model.
 3. **Trailhead**: see spec. Three start gates; riding through one selects that trail.
 4. **Jolly Green Giant** (green): rollers + pump mechanic.
 5. **Flow Monster** (blue): linked berms + tabletops.
@@ -99,4 +104,4 @@ Jump profiles live in `tools/jump-sim.js` and are pinned by tests. Current tuned
 7. **Scores**: top 10 per trail per split, fresh start (no v1 scores carried over).
 8. **Hosting**: GitHub Pages (or similar) so the boys can play on phones; then consider a shared score backend.
 
-Every new jump or roller feature must declare its expected landing ranges and get a test in `tests/`.
+Every new jump or roller feature must declare its expected landing ranges (`landings` in `src/jumps.js`, or on the trail feature if it changes the shape); `tests/jumps.test.js` checks them all.

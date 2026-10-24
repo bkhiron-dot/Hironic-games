@@ -1,34 +1,11 @@
-// The ground: one height function used by both physics and the terrain mesh,
-// so what you see is always what you ride on.
+// The terrain mesh: the trail and the forest floor around it.
 import * as THREE from './three.js';
-import { clamp, makeRandom } from './util.js';
-import { TRACK_LENGTH, cx, halfWidth, jumpHeight, bermHeight, bermAmount, curvature, jumpZone, kickerAt } from './trail.js';
-
-// Ground height at distance s down the track and sideways offset off.
-export function ground(s, off) {
-  // base grade (-0.2), a slow 7 m undulation, a steeper chute at 500-580 m, and the jumps
-  let h = -0.2 * s - 7 * Math.sin(s / 110) - 0.12 * clamp(s - 500, 0, 80) + jumpHeight(s);
-  const a = Math.abs(off), w = halfWidth(s);
-  h += bermHeight(s, off, w);
-  if (a > w) {
-    // off the trail the hillside rises away, with gentle lumps
-    const e = a - w;
-    h += Math.pow(e, 1.25) * 0.18 + 0.25 * Math.sin(s * 0.31 + off * 0.7) * Math.min(1, e / 2);
-  } else {
-    h -= 0.1 * (1 - (a / w) * (a / w)); // the trail is slightly worn into a shallow dish
-  }
-  return h;
-}
-
-// Same as ground(), from world x and z.
-export const groundAt = (x, z) => {
-  const s = -z;
-  return ground(s, x - cx(s));
-};
+import { makeRandom } from './util.js';
 
 /* ---------- Terrain ribbon mesh ----------
    A strip of triangles following the trail: fine columns across the trail, then
-   wider and wider columns out into the forest. */
+   wider and wider columns out into the forest. Heights come from trail.ground(), the
+   same function the physics uses, so what you see is always what you ride on. */
 const ACROSS_TRAIL = [-1, -0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1]; // fractions of the half width
 const BEYOND_EDGE = [0.6, 1.4, 2.6, 4.2, 6.5, 10, 15, 22, 32, 46, 66];       // metres past the trail edge
 
@@ -40,8 +17,9 @@ const COLOURS = {
 // Positions, colours, uvs and triangle indices. Uses `random` once per vertex for colour
 // noise, in row order; the forest is grown with the same random sequence afterwards,
 // so this order must not change or every tree moves.
-export function terrainData(random) {
-  const S0 = -20, S1 = TRACK_LENGTH + 80;
+export function terrainData(trail, random) {
+  const { cx, halfWidth, ground, jumpZone, kickerAt, bermAmount, curvature } = trail;
+  const S0 = -20, S1 = trail.length + 80;
   const cols = ACROSS_TRAIL.length + BEYOND_EDGE.length * 2, rows = S1 - S0 + 1;
   const positions = new Float32Array(rows * cols * 3), colours = new Float32Array(rows * cols * 3);
   const uvs = new Float32Array(rows * cols * 2);
@@ -116,8 +94,8 @@ function dirtTexture(renderer) {
   return texture;
 }
 
-export function buildTerrain(scene, renderer, random) {
-  const data = terrainData(random);
+export function buildTerrain(scene, renderer, trail, random) {
+  const data = terrainData(trail, random);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
   geometry.setAttribute('color', new THREE.BufferAttribute(data.colours, 3));

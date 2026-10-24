@@ -4,8 +4,6 @@
 // so only the forest near the rider is drawn.
 import * as THREE from './three.js';
 import { pickFrom } from './util.js';
-import { TRACK_LENGTH, ROCKY_SECTIONS, cx, halfWidth } from './trail.js';
-import { ground } from './terrain.js';
 
 export const CHUNK_LENGTH = 100;
 export const TREE_BUCKET_LENGTH = 5; // trees are also filed in 5 m buckets for crash checks
@@ -18,7 +16,8 @@ const ROCK_COLOURS = [0x6f736b, 0x7d8178, 0x5f6359];
 
 // Must run straight after the terrain colours, with the same random sequence, to grow
 // the same forest as v1. Returns { chunks: { [chunkIndex]: lists }, treeBuckets }.
-export function planForest(random) {
+export function planForest(trail, random) {
+  const { cx, halfWidth, ground, length } = trail;
   const chunks = {}, treeBuckets = {};
   const chunk = s => {
     const k = Math.floor(s / CHUNK_LENGTH);
@@ -26,7 +25,7 @@ export function planForest(random) {
   };
 
   // Tall gums both sides of the trail. Only these can be crashed into.
-  for (let s = -10; s < TRACK_LENGTH + 70; s += 0.55 + random() * 1.0) {
+  for (let s = -10; s < length + 70; s += 0.55 + random() * 1.0) {
     for (const side of [-1, 1]) {
       if (random() < 0.22) continue;
       const off = side * (halfWidth(s) + 1.3 + Math.pow(random(), 1.5) * 58);
@@ -45,7 +44,7 @@ export function planForest(random) {
   }
   // Tree ferns
   for (let n = 0; n < 2100; n++) {
-    const s = -10 + random() * (TRACK_LENGTH + 80), side = random() < 0.5 ? -1 : 1;
+    const s = -10 + random() * (length + 80), side = random() < 0.5 ? -1 : 1;
     const off = side * (halfWidth(s) + 0.5 + Math.pow(random(), 1.4) * 30);
     const x = cx(s) + off, z = -s, y = ground(s, off);
     const H = 0.8 + random() * 2.4, w = 1.1 + random() * 0.9, c = chunk(s);
@@ -54,15 +53,15 @@ export function planForest(random) {
   }
   // Undergrowth
   for (let n = 0; n < 1500; n++) {
-    const s = -10 + random() * (TRACK_LENGTH + 80), side = random() < 0.5 ? -1 : 1;
+    const s = -10 + random() * (length + 80), side = random() < 0.5 ? -1 : 1;
     const off = side * (halfWidth(s) + 3 + Math.pow(random(), 1.1) * 45);
     const c = chunk(s), w = 0.9 + random() * 1.8;
     c.bushes.push({ x: cx(s) + off, y: ground(s, off) + 0.1, z: -s, sx: w, sy: 0.45 + random() * 0.7, sz: w * (0.8 + random() * 0.4), ry: random() * 6, c: pickFrom(random, BUSH_COLOURS) });
   }
   // Rocks off the trail only, thicker beside the rocky sections
   for (let n = 0; n < 800; n++) {
-    const s = -5 + random() * (TRACK_LENGTH + 40);
-    const rocky = ROCKY_SECTIONS.some(r => s > r[0] && s < r[1]);
+    const s = -5 + random() * (length + 40);
+    const rocky = trail.scenery.rocky.some(r => s > r[0] && s < r[1]);
     if (!rocky && random() < 0.35) continue;
     const off = (random() < 0.5 ? -1 : 1) * (halfWidth(s) + 0.7 + random() * (rocky ? 5 : 2.5));
     const size = 0.2 + random() * (rocky ? 0.7 : 0.45);
