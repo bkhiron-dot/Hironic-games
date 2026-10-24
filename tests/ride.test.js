@@ -14,7 +14,6 @@ const speeds = (from, to) => { const r = []; for (let k = from; k <= to; k += 2)
 // just before the lip. These show as TODO in the test run, without failing it, until the
 // tuning round decides how to close them.
 const KNOWN_GAPS = {
-  'bigPop smooth 3': 'the game needs about 58 km/h with a pop; the simulator says 52',
   'normal big crash 0 76': 'at 76 km/h the game gives a small crash; the simulator a big one',
 };
 

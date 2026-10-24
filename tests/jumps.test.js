@@ -13,7 +13,6 @@ import { jumpOfKind, simulate } from '../tools/jump-sim.js';
 const AWAITING_DECISION = {
   'normal big crash 0 76': 'measured: small crash at 76 km/h',
   'popOptional smooth 0 52': 'measured: smooth 54-68 km/h',
-  'bigPop smooth 3 52': 'measured: smooth 56-68 km/h; last jump being reshaped',
 };
 const pending = (kind, { outcome, pop, from }) => AWAITING_DECISION[`${kind} ${outcome} ${pop} ${from}`];
 
