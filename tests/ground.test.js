@@ -1,10 +1,10 @@
 // The ground with s measured along the winding path (roadmap step 2b):
-// Hardline keeps v1's shape on the hill, the ground has no cliffs (even on the inside of the
+// Flow Monster keeps v1's shape on the hill, the ground has no cliffs (even on the inside of the
 // tightest bends), and the forest never grows on the trail.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { HARDLINE as T } from '../src/trails/index.js';
+import { FLOW_MONSTER as T } from '../src/trails/index.js';
 import { makeRandom } from '../src/util.js';
 import { terrainData } from '../src/terrain.js';
 import { planForest } from '../src/forest.js';
@@ -21,7 +21,7 @@ function loadV1Track() {
 // Is s on (or within `margin` of) a jump, from the start of its kicker to the end of its landing?
 const onJump = (s, margin) => T.jumps.some(j => s > j.s - j.kick - margin && s < j.end + margin);
 
-test('Hardline keeps v1 shape on the hill: same centreline, and the riding line at v1 height away from jumps', () => {
+test('Flow Monster keeps v1 shape on the hill: same centreline, and the riding line at v1 height away from jumps', () => {
   const v1 = loadV1Track();
   // The last jump was reshaped in tuning round 2 (lower knuckle, steeper landing), so after it
   // the trail sits lower than v1 by a fixed amount, but keeps v1's shape.
@@ -106,11 +106,11 @@ test('no cliffs across the trail and out to 60 m either side, all the way down',
   }
 });
 
-test('no tree, fern, bush or rock grows on the trail; gum count matches v1 for the longer path', () => {
+test('no tree, fern, bush, rock or log grows on the trail; gum count matches v1 for the longer path', () => {
   const random = makeRandom(T.seed);
   terrainData(T, random);
   const plan = planForest(T, random);
-  for (const [kind, gap] of [['trunks', 1.2], ['fernTrunks', 0.4], ['bushes', 2.5], ['rocks', 0.6]]) {
+  for (const [kind, gap] of [['trunks', 1.2], ['fernTrunks', 0.4], ['bushes', 2.5], ['rocks', 0.6], ['groundFerns', 0.5], ['logs', 2]]) {
     for (const chunk of Object.values(plan.chunks)) for (const it of chunk[kind]) {
       const at = T.locate(it.x, it.z);
       assert.ok(Math.abs(at.off) >= T.halfWidth(at.s) + gap - 1e-9, `${kind} at s = ${at.s.toFixed(1)} is ${Math.abs(at.off).toFixed(2)} m from the centreline`);

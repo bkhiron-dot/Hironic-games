@@ -23,6 +23,7 @@ export function createHud({ scores, trail, coarse }) {
     againBtn: $('againBtn'), pbLine: $('pbLine'), game: $('game'),
   };
   let toastTimer = 0, mineIds = new Set(), pending = [];
+  $('trailName').textContent = trail.name;
 
   function toast(message) {
     el.toast.textContent = message;

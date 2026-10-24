@@ -1,4 +1,4 @@
-// defineTrail() turns trail data (see src/trails/hardline.js) into the functions the game
+// defineTrail() turns trail data (see src/trails/flow-monster.js) into the functions the game
 // uses: where the trail goes, how wide it is, how high the ground is, and what's on it.
 // It checks the data first and explains any mistake in plain words.
 // Plain maths only (no Three.js), so tests can run it in Node.
@@ -18,6 +18,7 @@ import { resolveJump, jumpProfile, SHAPE_KEYS } from './jumps.js';
 import { createPath } from './path.js';
 
 export const SPLIT_COUNT = 4; // 3 splits + the finish: one high-score board each
+export const DIFFICULTIES = ['green', 'blue', 'black']; // trail grades, easiest first
 
 // Shape of the ground beside the trail (the same on every trail for now).
 const DISH_DEPTH = 0.1;           // the trail is worn into a shallow dish this deep (m)
@@ -172,10 +173,12 @@ export function defineTrail(data) {
   }
 
   return {
-    id: data.id, name: data.name, length, seed: data.seed, splits, start,
+    id: data.id, name: data.name, difficulty: data.difficulty, length, seed: data.seed, splits, start,
     scenery: { rocky: [], ...data.scenery }, jumps, berms,
     halfWidth, curvature, hillHeight, jumpHeight, lineHeight, kickerAt, jumpZone,
     bermAmount, bermHeight, ground, groundAt,
+    // on the riding surface (full grip, low drag)? (x, z) is the same point in the world
+    onTrail: (s, off) => Math.abs(off) <= halfWidth(s) + 0.3,
     pointAt: path.pointAt, headingAt: path.headingAt, locate: path.locate,
     downhillAt: path.downhillAt, pathAt: path.pathAt,
   };
@@ -197,8 +200,9 @@ function checkTrail(data) {
   };
 
   if (!data || typeof data !== 'object') fail('trail data is missing');
-  if (typeof data.id !== 'string' || !data.id) fail('needs an id, like "hardline"');
+  if (typeof data.id !== 'string' || !data.id) fail('needs an id, like "flow-monster"');
   if (typeof data.name !== 'string' || !data.name) fail('needs a name');
+  if (!DIFFICULTIES.includes(data.difficulty)) fail(`difficulty must be one of ${DIFFICULTIES.join(', ')}`);
   if (!isNumber(data.length) || data.length <= 0) fail('length must be a positive number of metres');
   if (!Number.isInteger(data.seed)) fail('seed must be a whole number');
   checkWaves(data.centreline, 'centreline');

@@ -2,15 +2,16 @@
 // States: 'menu' (start screen), 'ride', 'crash' (tumbling), 'done' (end screen).
 import * as THREE from './three.js';
 import { clamp } from './util.js';
-import { G, placeBikeAt, stepRide } from './physics.js';
+import { G, placeBikeAt, placeBikeAtPoint, stepRide } from './physics.js';
 import { releaseAll } from './input.js';
 import { formatTime } from './hud.js';
 
-export function createRun({ b, keys, trail, scene, chassis, rider, treeBuckets, hud, scores, chaseCamera }) {
-  const { spawn, gate } = trail.start; // where the bike waits, and the timing gate
-  const splitsAt = trail.splits;
+// effects: the dirt thrown up on berm hits and landings (visual only).
+export function createRun({ b, keys, trail, scene, chassis, rider, treeBuckets, hud, scores, chaseCamera, effects }) {
+  const { spawn, gate } = trail.start; // where the bike waits at the gate, and the timing gate
+  const splitsAt = trail.splits, th = trail.trailhead; // th: the clearing at the top, if any
   let state = 'menu', runTime = 0, timing = false, nextSplit = 0, crashes = 0, splits = [];
-  let crashT = 0, crashBig = false, crashS = 0;
+  let crashT = 0, crashBig = false, crashS = 0, againstFence = false;
   const tumble = { vx: 0, vy: 0, vz: 0, spin: new THREE.Vector3(), fallDir: 1 };
 
   // Put the rider back on the bike after a tumble.
@@ -20,18 +21,29 @@ export function createRun({ b, keys, trail, scene, chassis, rider, treeBuckets, 
     rider.rotation.set(0, 0, 0);
   }
 
-  function resetRun() {
+  // from: 'trailhead' (at rest at the back of the clearing) or 'gate' (just above the start gate).
+  function resetRun(from = 'trailhead') {
     runTime = 0; timing = false; nextSplit = 0; crashes = 0; splits = [];
     remount();
-    placeBikeAt(b, trail, spawn, 0);
+    if (th && from === 'trailhead') placeBikeAtPoint(b, trail, th.dropIn.x, th.dropIn.z, th.dropIn.h, 0);
+    else placeBikeAt(b, trail, spawn, 0);
     chaseCamera.snap(b);
     hud.resetSplit();
   }
 
-  function startRun() {
-    resetRun();
+  function startRun(from = 'trailhead') {
+    resetRun(from);
     state = 'ride';
     hud.hideScreens();
+  }
+
+  // The trailhead fence and the closed gates stop the bike where it touches them.
+  function stopAtFence(x0, z0) {
+    const hit = th && th.blocked(x0, z0, b.x, b.z);
+    if (!hit) { againstFence = false; return; }
+    b.x = x0; b.z = z0; b.s = trail.locate(x0, z0).s; b.v = 0; b.slipV = 0;
+    if (!againstFence) hud.toast(hit.gate ? hit.gate.name + ': coming soon' : 'Fence: head for the open gate');
+    againstFence = true;
   }
 
   // Small crash: tumble, get back on where you fell, clock keeps running.
@@ -71,15 +83,19 @@ export function createRun({ b, keys, trail, scene, chassis, rider, treeBuckets, 
   }
 
   function stepRiding(dt) {
+    const x0 = b.x, z0 = b.z;
     const events = stepRide(b, keys, trail, treeBuckets, timing, dt);
     for (const e of events) {
       if (e.type === 'toast') hud.toast(e.text);
       else if (e.type === 'shake') chaseCamera.setShake(e.amount);
+      else if (e.type === 'bermHit') { effects.bermHit(b, e.strength, e.side); chaseCamera.setShake(0.15 * e.strength); }
+      else if (e.type === 'landing') effects.landing(b, e.use);
       else if (e.type === 'crash') { crash(e.reason, e.big); return; }
     }
-    // timing starts at the start gate; each split gate records a time
-    const s = b.s;
-    if (!timing && s > gate && nextSplit === 0 && runTime === 0) timing = true;
+    stopAtFence(x0, z0);
+    // timing starts through the start gate (out of the clearing); each split gate records a time
+    const s = b.s, leftClearing = !th || !th.inClearing(b.x, b.z);
+    if (!timing && s > gate && leftClearing && nextSplit === 0 && runTime === 0) timing = true;
     if (timing) runTime += dt;
     if (timing && nextSplit < splitsAt.length && s >= splitsAt[nextSplit]) {
       splits[nextSplit] = runTime;
@@ -89,7 +105,7 @@ export function createRun({ b, keys, trail, scene, chassis, rider, treeBuckets, 
       if (nextSplit === splitsAt.length) { endRun('finish'); return; }
       hud.toast('Split ' + n + '  ' + formatTime(runTime));
     }
-    if (s < -15) placeBikeAt(b, trail, spawn, 0); // rode back up past the top: start again
+    if (!th && s < -15) placeBikeAt(b, trail, spawn, 0); // rode back up past the top: start again
   }
 
   function stepCrashing(dt) {

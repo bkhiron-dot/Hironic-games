@@ -85,3 +85,8 @@ body{background:var(--forest);color:var(--ink);font-family:var(--body);padding-l
 .err{color:var(--behind);font-size:13px}
 #nameForm{display:flex;flex-direction:column;gap:8px}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}.hs-row.mine{animation:none}}
+.trail-name{color:var(--ink);margin-bottom:2px}
+.end-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.btn.quiet{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.old-version{font-size:13px}
+.old-version a{color:var(--ink-dim)}

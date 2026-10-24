@@ -12,7 +12,9 @@ import { NEAR_REACH } from './trail.js';
 
 const ACROSS_TRAIL = [-1, -0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1]; // fractions of the half width
 const BEYOND_EDGE = [0.6, 1.4, 2.6, 4.2, 6.5, 10, 14, 19, NEAR_REACH];      // metres past the trail edge
-const STRIP_FROM = -20, STRIP_PAST_END = 80; // the strip runs from 20 m above the start to 80 m past the finish
+const STRIP_FROM = -20, STRIP_PAST_END = 80; // the strip runs from 20 m above the start to 80 m past the finish...
+const STRIP_FROM_TRAILHEAD = -70;             // ...or from behind the trailhead clearing, if there is one
+const stripFrom = trail => trail.trailhead ? STRIP_FROM_TRAILHEAD : STRIP_FROM;
 const GRID_CELL = 4;      // hillside grid spacing (m)
 const GRID_MARGIN = 160;  // hillside reaches this far sideways beyond the trail's widest swing (m)
 const TUCK = 0.4;         // hillside sits this far under the strip where they overlap (m)
@@ -32,11 +34,23 @@ function floorColour(out, c, noise, x, z) {
   return out;
 }
 
+// The trailhead clearing (if this trail has one) is packed dirt: blend toward it by how
+// much of the pad is at (x, z). n is a 0..1 speckle.
+function padColour(out, c, trail, n, x, z) {
+  const pad = trail.trailhead ? trail.trailhead.padAmount(x, z) : 0;
+  if (pad > 0) out.lerp(PAD_TMP.copy(c.edge).lerp(c.trail2, 0.3 + n * 0.4), pad);
+  return out;
+}
+const PAD_TMP = new THREE.Color();
+
 // The detailed strip: positions, colours, uvs and triangle indices.
 // Uses `random` once per vertex for colour noise.
 export function terrainData(trail, random) {
   const { halfWidth, ground, jumpZone, kickerAt, bermAmount, curvature } = trail;
-  const S0 = STRIP_FROM, S1 = trail.length + STRIP_PAST_END;
+  const S0 = stripFrom(trail), S1 = trail.length + STRIP_PAST_END;
+  // rows above the usual start (round the trailhead) take their colour noise from their own
+  // random sequence, so the forest after the terrain doesn't move
+  const above = makeRandom(trail.seed + 2);
   const cols = ACROSS_TRAIL.length + BEYOND_EDGE.length * 2, rows = S1 - S0 + 1;
   const positions = new Float32Array(rows * cols * 3), colours = new Float32Array(rows * cols * 3);
   const uvs = new Float32Array(rows * cols * 2);
@@ -46,14 +60,19 @@ export function terrainData(trail, random) {
     const s = S0 + r, w = halfWidth(s);
     const offsets = [...BEYOND_EDGE.slice().reverse().map(d => -(w + d)), ...ACROSS_TRAIL.map(t => t * w), ...BEYOND_EDGE.map(d => w + d)];
     const zone = jumpZone(s), onKicker = !!kickerAt(s);
+    const ridden = !trail.trailhead || s >= 0; // above a trailhead the trail's line is just forest
     for (let col = 0; col < cols; col++, i++) {
       const off = offsets[col], e = Math.abs(off) - w, p = trail.pointAt(s, off);
       positions[i * 3] = p.x; positions[i * 3 + 1] = ground(s, off); positions[i * 3 + 2] = p.z;
       uvs[i * 2] = p.x / 2.5; uvs[i * 2 + 1] = -p.z / 2.5;
-      const n = random();
-      if (e < -0.01) {
+      const n = s < STRIP_FROM ? above() : random();
+      if (!ridden) {
+        floorColour(tmp, c, noise, p.x, p.z);
+      } else if (e < -0.01) {
         // on the trail: packed dirt, redder clay on kickers, landings and berm walls
         tmp.copy(c.trail).lerp(c.trail2, n * 0.35 + 0.3 * (Math.abs(off) / w));
+        // the worn riding line down the middle: darker, damper, packed loam
+        tmp.lerp(c.loam, 0.3 * Math.max(0, 1 - Math.abs(off) / (0.45 * w)));
         if (onKicker || zone === 'knuckle' || zone === 'sweet' || zone === 'bottom') tmp.lerp(c.clay, 0.55);
         if (zone === 'sweet') tmp.lerp(c.trail, 0.25);
         const berm = bermAmount(s);
@@ -63,6 +82,7 @@ export function terrainData(trail, random) {
       } else {
         floorColour(tmp, c, noise, p.x, p.z);
       }
+      padColour(tmp, c, trail, n, p.x, p.z);
       colours[i * 3] = tmp.r; colours[i * 3 + 1] = tmp.g; colours[i * 3 + 2] = tmp.b;
     }
   }
@@ -88,11 +108,11 @@ function gridIndices(rows, cols, keep = () => true) {
 export function hillsideData(trail) {
   const { halfWidth } = trail;
   let minX = Infinity, maxX = -Infinity;
-  for (let s = STRIP_FROM; s <= trail.length + STRIP_PAST_END; s += 5) {
+  for (let s = stripFrom(trail); s <= trail.length + STRIP_PAST_END; s += 5) {
     const p = trail.pointAt(s);
     minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
   }
-  const x0 = minX - GRID_MARGIN, z0 = trail.pointAt(STRIP_FROM).z + 120;
+  const x0 = minX - GRID_MARGIN, z0 = trail.pointAt(stripFrom(trail)).z + 120;
   const zEnd = trail.pointAt(trail.length + STRIP_PAST_END).z - 60;
   const cols = Math.ceil((maxX + GRID_MARGIN - x0) / GRID_CELL) + 1, rows = Math.ceil((z0 - zEnd) / GRID_CELL) + 1;
   const positions = new Float32Array(rows * cols * 3), colours = new Float32Array(rows * cols * 3);
@@ -103,13 +123,14 @@ export function hillsideData(trail) {
     for (let col = 0; col < cols; col++, i++) {
       const x = x0 + col * GRID_CELL, z = z0 - r * GRID_CELL;
       const at = trail.locate(x, z);
-      const insideStrip = at.s > STRIP_FROM && at.s < trail.length + STRIP_PAST_END;
+      const insideStrip = at.s > stripFrom(trail) && at.s < trail.length + STRIP_PAST_END;
       const past = Math.abs(at.off) - halfWidth(at.s); // metres past the trail edge
       const under = insideStrip && past < NEAR_REACH - 0.5;
       deepUnder[i] = insideStrip && past < NEAR_REACH - GRID_CELL * 1.5 ? 1 : 0;
       positions[i * 3] = x; positions[i * 3 + 1] = trail.groundAt(x, z) - (under ? TUCK : 0); positions[i * 3 + 2] = z;
       uvs[i * 2] = x / 2.5; uvs[i * 2 + 1] = -z / 2.5;
       floorColour(tmp, c, noise, x, z);
+      padColour(tmp, c, trail, noise(x * 3.1, z * 3.1), x, z);
       colours[i * 3] = tmp.r; colours[i * 3 + 1] = tmp.g; colours[i * 3 + 2] = tmp.b;
     }
   }

@@ -4,8 +4,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createPath } from '../src/path.js';
 
-const HARDLINE_WAVES = [{ amp: 22, period: 45, phase: 0 }, { amp: 8, period: 23, phase: 1 }];
-const path = createPath(HARDLINE_WAVES, -80, 1500);
+const FLOW_MONSTER_WAVES = [{ amp: 22, period: 45, phase: 0 }, { amp: 8, period: 23, phase: 1 }];
+const path = createPath(FLOW_MONSTER_WAVES, -80, 1500);
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg}: ${a} vs ${b}`);
 
 test('s is distance along the path: 1 m of s is 1 m of riding, even on bends', () => {
@@ -13,8 +13,8 @@ test('s is distance along the path: 1 m of s is 1 m of riding, even on bends', (
     const a = path.pointAt(s), b = path.pointAt(s + 0.1);
     near(Math.hypot(b.x - a.x, b.z - a.z), 0.1, 1e-6, `0.1 m step at s = ${s}`);
   }
-  // Hardline straight down the hill is 1200 m; along its winding path it is 1297.45 m
-  near(path.pathAt(1200), 1297.45, 0.01, 'Hardline path length');
+  // Flow Monster straight down the hill is 1200 m; along its winding path it is 1297.45 m
+  near(path.pathAt(1200), 1297.45, 0.01, 'Flow Monster path length');
 });
 
 test('converting between s and downhill distance is exact both ways', () => {

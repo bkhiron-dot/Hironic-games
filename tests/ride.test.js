@@ -1,4 +1,4 @@
-// Rides the game's own physics (src/physics.js) on the Hardline trail:
+// Rides the game's own physics (src/physics.js) on the Flow Monster trail:
 // - every jump, at chosen speeds at the lip, lands the way its kind declares (the ranges
 //   the jump simulator checks), so the game and the simulator agree;
 // - a scripted rider gets from the start gate to the finish.
@@ -11,7 +11,7 @@ const speeds = (from, to) => { const r = []; for (let k = from; k <= to; k += 2)
 for (const j of T.jumps) {
   for (const landing of j.landings) {
     const { pop, from, to, outcome } = landing;
-    // Declared ranges come from a straight test trail; on Hardline the bends and the hill under
+    // Declared ranges come from a straight test trail; on Flow Monster the bends and the hill under
     // each jump move range edges a little. So check the declared range 2 km/h in from each edge
     // (single-speed checks, like "small crash at 76 km/h", are checked as they are).
     const lo = to - from >= 4 ? from + 2 : from, hi = to - from >= 4 ? to - 2 : to;

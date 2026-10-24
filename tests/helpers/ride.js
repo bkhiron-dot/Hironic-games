@@ -1,10 +1,10 @@
-// Rides the game's own physics (src/physics.js) on the Hardline trail with a scripted rider.
+// Rides the game's own physics (src/physics.js) on the Flow Monster trail with a scripted rider.
 // Shared by tests/ride.test.js and tuning reports.
-import { HARDLINE as T } from '../../src/trails/index.js';
+import { FLOW_MONSTER as T } from '../../src/trails/index.js';
 import { makeRandom } from '../../src/util.js';
 import { terrainData } from '../../src/terrain.js';
 import { planForest } from '../../src/forest.js';
-import { createBikeState, placeBikeAt, stepRide } from '../../src/physics.js';
+import { createBikeState, placeBikeAt, placeBikeAtPoint, stepRide } from '../../src/physics.js';
 import { classify, rideJump as rideJumpOn } from '../../tools/jump-sim.js';
 import { PHYSICS_STEP } from '../../src/clock.js';
 
@@ -36,7 +36,7 @@ function rideLine(b, keys, kicker) {
   steerAlongTrail(b, keys);
 }
 
-// Ride one jump on Hardline so the bike reaches the lip at lipKmh, aiming the kicker at the
+// Ride one jump on Flow Monster so the bike reaches the lip at lipKmh, aiming the kicker at the
 // landing like a rider (the simulator's rider, tools/jump-sim.js). Returns { lipKmh, outcome, ... }.
 export function rideJump(j, lipKmh, pop) {
   return rideJumpOn(T, j, lipKmh, pop, (keys, b, kicker) => rideLine(b, keys, kicker));
@@ -44,13 +44,17 @@ export function rideJump(j, lipKmh, pop) {
 
 // A whole run from the start: hold a sensible speed for each section (below 58 km/h between
 // jumps, mid-range at each lip, popping where the jump needs it) and steer along the trail.
-// Returns { crash, splitsPassed, landings, time }.
+// By default it starts at the start gate on Flow Monster; give it a trail with a trailhead
+// (and that trail's trees) to drop in from the clearing instead.
+// Returns { crash, splitsPassed, landings, time (from the start gate), fence (any fence hit) }.
 const LIP_PLAN = { normal: { kmh: 56, pop: 0 }, popOptional: { kmh: 60, pop: 0 }, bigPop: { kmh: 60, pop: 3 } };
-export function rideTrail() {
+export function rideTrail({ trail = T, trees = treeBuckets } = {}) {
   const b = createBikeState(), keys = { left: false, right: false, pedal: false, brake: false, hop: false };
-  placeBikeAt(b, T, T.start.spawn, 0);
+  const th = trail.trailhead;
+  if (th) placeBikeAtPoint(b, trail, th.dropIn.x, th.dropIn.z, th.dropIn.h, 0);
+  else placeBikeAt(b, trail, trail.start.spawn, 0);
   const splitsPassed = [], landings = [];
-  let time = 0;
+  let time = 0, timing = !th, fence = null;
   for (let step = 0; step < 300 / DT && b.s < T.length; step++) {
     // the next jump within 60 m sets the target speed; otherwise cruise
     const next = T.jumps.find(j => b.s > j.s - j.kick - 60 && b.s < j.s);
@@ -61,16 +65,18 @@ export function rideTrail() {
     const k = T.kickerAt(b.s);
     rideLine(b, keys, k);
     keys.hop = !!(plan && plan.pop && k && k.u < -b.v * DT);
-    const before = b.s;
-    const events = stepRide(b, keys, T, treeBuckets, true, DT);
-    time += DT;
+    const before = b.s, x0 = b.x, z0 = b.z;
+    const events = stepRide(b, keys, trail, trees, timing, DT);
+    if (th && !fence) fence = th.blocked(x0, z0, b.x, b.z);
+    if (!timing && b.s > trail.start.gate && !th.inClearing(b.x, b.z)) timing = true; // through the gate
+    if (timing) time += DT;
     for (const e of events) {
-      if (e.type === 'crash') return { crash: { ...e, s: b.s }, splitsPassed, landings, time };
+      if (e.type === 'crash') return { crash: { ...e, s: b.s }, splitsPassed, landings, time, fence };
       // the first touchdown past each lip is that jump's landing (later ones are small bounces)
       const jump = T.jumps.find(j => b.s > j.s && b.s < j.end);
       if (e.type === 'landing' && jump && !landings.some(l => l.at === jump.s)) landings.push({ at: jump.s, zone: e.zone, outcome: classify(e.use) });
     }
     for (const s of T.splits) if (before < s && b.s >= s) splitsPassed.push(s);
   }
-  return { crash: null, splitsPassed, landings, time };
+  return { crash: null, splitsPassed, landings, time, fence };
 }
