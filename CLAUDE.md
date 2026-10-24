@@ -10,6 +10,7 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 - Flag any assumption or approximation clearly and agree it before building on it.
 - Prefer small, reviewable commits. Run `npm test` before every commit.
 - When changing physics or a jump, re-run the jump simulator and report the new landing ranges as a table (speed at lip -> smooth / heavy / small crash / big crash).
+- **Previews** (Ben, 24 Oct): not on every PR. Add the `preview` label only when Ben asks, and suggest it when a change is significant or risky (physics or jump changes, new trails or features, big visual changes, anything that could hurt phone frame rate).
 
 ## Commands
 
@@ -29,6 +30,7 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 - `public/v2.html` - redirect from the old v2 address to the home page.
 - `src/dirt.js` - dirt thrown up by the tyres (crumbs when rolling, roost and dust growing with drift, an explosion on a berm hit, puffs on landings). `src/tracks.js` - tyre tracks in the dirt. Both visual only.
 - Adding `?debug` to the address exposes the game state as `window.hardline` for test tools (screenshots, tuning).
+- `.github/workflows/deploy-pages.yml` + `tools/build-site.sh` - publish to GitHub Pages: main at the root on every push; an open pull request labelled `preview` also at `preview/pr-<number>/`, rebuilt on each push while labelled, link posted on the PR. Label removed or PR closed: the preview goes at the next publish. Previews never block main (a broken one is skipped).
 - `tools/jump-sim.js` - jump simulator: rides a jump with the game's own physics (`stepRide`, 1/240 s steps) on a straight test trail at -0.2 grade, or on a real trail (`rideJump`). `npm run jumps` prints every jump on every trail.
 - `tests/` - `node:test` tests. `ground.test.js` checks Flow Monster against v1's own code (read out of `public/v1.html`) away from jumps, and that the ground has no cliffs. `ride.test.js` rides the game's physics over every jump and the whole trail (`tests/helpers/ride.js`). `berm.test.js` checks berm hits. `trailhead.test.js` checks the clearing (level, no cliffs, gates and fence, forest unmoved) and a run from the drop-in to the finish.
 - `docs/v2-trailhead-spec.md` - the agreed design for the trailhead and the three trails.
@@ -84,7 +86,8 @@ Jump shapes and their declared landing ranges live in `src/jumps.js` and are che
 
 | Jump | Smooth | Notes |
 |---|---|---|
-| Normal (177 m, 743 m) | 46-68 no pop, 34-52 pop | lip 1.1 m, gap 6 m. Too fast: small crash at 76, big crash from 78 km/h |
+| Normal (177 m) | 46-68 no pop, 34-52 pop | lip 1.1 m, gap 6 m, landing 30 m. Too fast: small crash at 76, big crash from 78 km/h |
+| Normal, longer landing (743 m) | 46-70 no pop, 34-52 pop | Landing 33 m (+10%, Ben overshot it twice): heavy 72-76, small crash 78, big crash from 80 km/h; with a pop heavy 54-60, small crash 62-64, big crash from 66. Trail below sits 0.58 m lower |
 | Big, pop optional (438 m) | 52-66 no pop, 46-54 pop | lip 1.5 m, gap 8.5 m (was 9; tuning round 2), 42 m landing |
 | Big, needs pop, kind `bigPop` (1037 m) | 54-66 pop; no pop cases | Shaped with Ben (tuning rounds 2-4): kicker 12 m, lip 1.8 m, gap 12 m, knuckle 2.4 m, landing 48 m at pitch 0.7. Sweet spot 12.3-30.1 m past the lip. Round 3's 2.2 m lip overshot with a pop at speed; this one is built for a fast pop (lip reachable at about 62 on Flow Monster) |
 

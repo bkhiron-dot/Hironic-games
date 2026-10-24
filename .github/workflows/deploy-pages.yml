@@ -1,34 +1,54 @@
-# Builds the game and publishes it to GitHub Pages on every push to main.
+# Builds the game and publishes it to GitHub Pages:
+#  - on every push to main (the live game, at the root of the site);
+#  - when a pull request is labelled "preview", and on each push to it while it has the
+#    label: a playable preview at preview/pr-<number>/ (see tools/build-site.sh). Removing
+#    the label, or closing the pull request, takes the preview down at the next publish.
 # One-off setup in GitHub: Settings -> Pages -> Source: "GitHub Actions".
+#
+# Pull request runs use pull_request_target, so this file and the publish step always come
+# from main (Pages only accepts publishing from main). The pull request's code is only built
+# into the preview folder, and only for pull requests from this repository, not forks.
 name: Deploy to GitHub Pages
 
 on:
   push:
     branches: [main]
+  pull_request_target:
+    types: [labeled, unlabeled, synchronize, reopened, closed]
   workflow_dispatch:
 
 permissions:
   contents: read
   pages: write
   id-token: write
+  pull-requests: write
 
-# Only one deploy at a time; a newer push replaces a queued one.
+# Only one publish at a time; a newer one replaces a queued one. Every run builds the whole
+# site (main plus all current previews), so the latest run is always complete.
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
   build:
+    # pull request events only matter for pull requests that have (or just lost) the label
+    if: >-
+      github.event_name != 'pull_request_target' ||
+      contains(github.event.pull_request.labels.*.name, 'preview') ||
+      github.event.label.name == 'preview'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
+      - run: bash tools/build-site.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -40,6 +60,23 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # When the label is first added, post the preview link on the pull request.
+  link:
+    needs: deploy
+    if: github.event.action == 'labeled' && github.event.label.name == 'preview'
+    runs-on: ubuntu-latest
+    steps:
+      - run: >-
+          gh pr comment "$PR" --repo "$REPO"
+          --body "Preview: ${PAGE_URL}preview/pr-${PR}/ (rebuilt on every push while this has the \`preview\` label; remove the label to take it down)"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          PAGE_URL: ${{ needs.deploy.outputs.page_url }}
