@@ -107,6 +107,7 @@ Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diago
 - **The jump simulator rides the game's own physics** (tuning round 2). The old separate simulator had no air drag and popped exactly at the lip, so its ranges were up to 6 km/h off. Declared ranges must come from it, and must be reachable on the trail: check the fastest lip speed (table above) before shaping a jump. A higher lip or lower knuckle needs a steeper landing, or riders land too hard.
 - **The bike can't steer in the air**, so on a jump on a bend it flies straight while the trail curves away. Flow Monster's last jump (1037 m) is on a 145 m bend on the narrowest part of the trail (half width 2.3 m): ridden straight up the kicker it lands about 1.8 m off-centre. Riders (and `tests/helpers/ride.js`) aim the take-off at the landing.
 - **The trailhead clearing is cut into a valley**: the trail runs between banks that rise up to 20 m within 25 m of it, so a level 50 x 36 m pad with a smooth blend made cliffs (1.5 m per 0.5 m). The ground round it is graded instead: it may rise above or fall below the pad no faster than 0.7 (35 degrees, easing in over 6 m), and is the plain hill wherever that's gentler. Steepest step round it: 0.35 m per 0.5 m (limit 0.5). Past the gate the trail itself is untouched from 2 m on.
+- **Deploy concurrency is per job, not per workflow.** With one workflow-level group, the "pull request closed" run (skipped, no preview label) cancelled the publish of PR #11's merge, so main didn't go live. A skipped job never joins a job-level group.
 - Anything drawn on the ground (tyre tracks) must also wind its triangles to face up, or it is culled and invisible.
 - Every plant kind added to the forest must be listed in the ground test's "nothing grows on the trail" check, with its gap.
 - Plant triangle budget: about 525k across 16 chunks, about 100k drawn at once (tree-fern crowns 112 each, ground ferns 42). Check phones before adding more.
@@ -126,6 +127,11 @@ Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diago
 5. **Back in Black** (black): all mandatory gaps: a range of gaps, step-downs and step-ups. No B lines. New jump kinds declare landing ranges checked against reachable lip speeds.
 6. **Scores**: top 10 per trail per split, with trail tabs, fresh start (no v1 scores carried over). (Trail ids changed in step 3: `hardline` became `flow-monster`, so any v2 scores already saved on a device no longer show.)
 7. **Hosting** (done for the game: GitHub Pages on every push to main); then consider a shared score backend.
-8. **The rest of the mountain** (later): upper mountain (fast and steep) above the mid-mountain trailhead, lower mountain (wide and flowing) below it, Maydena-style.
+8. **The rest of the mountain** (later): upper mountain (fast and steep) above the mid-mountain trailhead, lower mountain (wide and flowing) below it, Maydena-style. Agreed design (see spec, "The mountain"):
+   - three stages, each with a green, blue and black line;
+   - lines meet only at trailheads, and are kept at least 40 m apart elsewhere;
+   - one stage loaded at a time;
+   - rolling starts: each stage's start brings speed into a known band, tested for every incoming x outgoing line;
+   - freeride (untimed, any line) and race mode (timed, one colour top to bottom, barricaded course through trailheads).
 
 Every new jump or roller feature must declare its expected landing ranges (`landings` in `src/jumps.js`, or on the trail feature if it changes the shape); `tests/jumps.test.js` checks them all.
