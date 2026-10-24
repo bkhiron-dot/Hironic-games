@@ -23,10 +23,11 @@ const onJump = (s, margin) => T.jumps.some(j => s > j.s - j.kick - margin && s <
 
 test('Flow Monster keeps v1 shape on the hill: same centreline, and the riding line at v1 height away from jumps', () => {
   const v1 = loadV1Track();
-  // The last jump was reshaped in tuning round 2 (lower knuckle, steeper landing), so after it
-  // the trail sits lower than v1 by a fixed amount, but keeps v1's shape.
-  const last = T.jumps[T.jumps.length - 1];
-  let checked = 0, offsetAfterLast = null;
+  // Jumps reshaped since v1 (the last one in tuning rounds 2-4, the one at 743 m with a longer
+  // landing) lower the trail by a different amount, so after a jump the trail may sit a fixed
+  // amount off v1, but between jumps it must keep v1's shape exactly.
+  const offsets = new Map(); // jump -> how far off v1 the trail sits after it
+  let checked = 0;
   for (let s = 0; s < T.length; s += 0.83) {
     const p = T.pointAt(s), d = -p.z;
     assert.ok(Math.abs(p.x - v1.cx(d)) < 1e-9, `centreline at s = ${s}`);
@@ -34,15 +35,17 @@ test('Flow Monster keeps v1 shape on the hill: same centreline, and the riding l
     const v1Jump = v1.JUMPS.some(j => d > j.s - j.kick - 3 && d < j.s + j.gap + j.land + 3);
     if (onJump(s, 3) || v1Jump) continue;
     let diff = T.ground(s, 0) - v1.ground(d, 0);
-    if (s > last.end) {
-      if (offsetAfterLast === null) offsetAfterLast = diff;
-      diff -= offsetAfterLast;
+    const before = T.jumps.filter(j => s > j.end);
+    if (before.length) {
+      const j = before[before.length - 1];
+      if (!offsets.has(j)) offsets.set(j, diff);
+      diff -= offsets.get(j);
     }
     assert.ok(Math.abs(diff) < 1e-6, `riding line at s = ${s.toFixed(1)}: ${diff} m from v1`);
     checked++;
   }
   assert.ok(checked > 1000, `only ${checked} points checked`);
-  console.log(`  after the reshaped last jump the trail is ${(-offsetAfterLast).toFixed(2)} m lower than v1`);
+  for (const [j, off] of offsets) if (Math.abs(off) > 1e-6) console.log(`  after the reshaped jump at ${j.s} m the trail is ${(-off).toFixed(2)} m lower than v1`);
 });
 
 test('the trail is its full width square to the path, on bends too', () => {
