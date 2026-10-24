@@ -54,7 +54,10 @@ test('jump zones, kickers and berms match v1', () => {
 
 test('jump definitions match v1', () => {
   assert.equal(JUMPS.length, v1.JUMPS.length);
-  JUMPS.forEach((j, i) => assert.deepEqual(j, v1.JUMPS[i], `jump ${i}`));
+  // every number v1 had (shape, flags, position); v2 jumps also carry their kind and landing ranges
+  JUMPS.forEach((j, i) => {
+    for (const [key, value] of Object.entries(v1.JUMPS[i])) assert.equal(j[key], value, `jump ${i} ${key}`);
+  });
 });
 
 test('seeded random numbers match v1, so the forest grows in the same places', () => {
