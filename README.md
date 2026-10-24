@@ -32,4 +32,6 @@ Open a terminal in this folder and run `claude`. Claude reads `CLAUDE.md` for th
 Every push to `main` runs `.github/workflows/deploy-pages.yml`: it runs the tests, builds with Vite and publishes `dist/` to
 https://bkhiron-dot.github.io/Hironic-games/ (the game; v1 at `/Hironic-games/v1.html`).
 
+**Previews**: add the label `preview` to a pull request and the workflow also publishes that pull request at `https://bkhiron-dot.github.io/Hironic-games/preview/pr-<number>/` (it comments the link on the pull request). It's rebuilt on every push while the label is on; remove the label or close the pull request and it's taken down. Use it for bigger or riskier changes you want to play on a phone before merging. (Previews only work once this workflow is on main, and only for pull requests from this repository.)
+
 One-off setup in GitHub: **Settings -> Pages -> Build and deployment -> Source: GitHub Actions**. Pages on a private repo needs a paid GitHub plan; the published site is public either way.

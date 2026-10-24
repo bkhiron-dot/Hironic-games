@@ -10,6 +10,7 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 - Flag any assumption or approximation clearly and agree it before building on it.
 - Prefer small, reviewable commits. Run `npm test` before every commit.
 - When changing physics or a jump, re-run the jump simulator and report the new landing ranges as a table (speed at lip -> smooth / heavy / small crash / big crash).
+- **Previews** (Ben, 24 Oct): not on every PR. Add the `preview` label only when Ben asks, and suggest it when a change is significant or risky (physics or jump changes, new trails or features, big visual changes, anything that could hurt phone frame rate).
 
 ## Commands
 
@@ -29,6 +30,7 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 - `public/v2.html` - redirect from the old v2 address to the home page.
 - `src/dirt.js` - dirt thrown up by the tyres (crumbs when rolling, roost and dust growing with drift, an explosion on a berm hit, puffs on landings). `src/tracks.js` - tyre tracks in the dirt. Both visual only.
 - Adding `?debug` to the address exposes the game state as `window.hardline` for test tools (screenshots, tuning).
+- `.github/workflows/deploy-pages.yml` + `tools/build-site.sh` - publish to GitHub Pages: main at the root on every push; an open pull request labelled `preview` also at `preview/pr-<number>/`, rebuilt on each push while labelled, link posted on the PR. Label removed or PR closed: the preview goes at the next publish. Previews never block main (a broken one is skipped).
 - `tools/jump-sim.js` - jump simulator: rides a jump with the game's own physics (`stepRide`, 1/240 s steps) on a straight test trail at -0.2 grade, or on a real trail (`rideJump`). `npm run jumps` prints every jump on every trail.
 - `tests/` - `node:test` tests. `ground.test.js` checks Flow Monster against v1's own code (read out of `public/v1.html`) away from jumps, and that the ground has no cliffs. `ride.test.js` rides the game's physics over every jump and the whole trail (`tests/helpers/ride.js`). `berm.test.js` checks berm hits. `trailhead.test.js` checks the clearing (level, no cliffs, gates and fence, forest unmoved) and a run from the drop-in to the finish.
 - `docs/v2-trailhead-spec.md` - the agreed design for the trailhead and the three trails.
