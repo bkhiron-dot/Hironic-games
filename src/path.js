@@ -39,7 +39,14 @@ export function createPath(waves, dFrom, dTo) {
   }
 
   // d for a given s: find the table step, then a few Newton steps (ds/dd = stretch).
+  // Remembers the last answer, because the same s is often asked for several times in a row.
+  let lastS = NaN, lastD = 0;
   function downhillAt(s) {
+    if (s === lastS) return lastD;
+    lastD = findDownhill(s); lastS = s;
+    return lastD;
+  }
+  function findDownhill(s) {
     let lo = 0, hi = count - 1;
     if (s <= sTable[0]) lo = hi = 0;
     else if (s >= sTable[count - 1]) lo = hi = count - 1;

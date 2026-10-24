@@ -38,7 +38,7 @@ export function createRun({ b, keys, trail, scene, chassis, rider, treeBuckets, 
   // Big crash: bigger tumble, then the run is over.
   function crash(reason, big) {
     if (state !== 'ride') return;
-    state = 'crash'; crashT = 0; crashBig = big; crashS = -b.z;
+    state = 'crash'; crashT = 0; crashBig = big; crashS = b.s;
     if (!big) crashes++;
     const f = [Math.sin(b.h), -Math.cos(b.h)], k = big ? 1 : 0.55;
     scene.attach(rider); // the rider leaves the bike and flies on alone
@@ -78,7 +78,7 @@ export function createRun({ b, keys, trail, scene, chassis, rider, treeBuckets, 
       else if (e.type === 'crash') { crash(e.reason, e.big); return; }
     }
     // timing starts at the start gate; each split gate records a time
-    const s = -b.z;
+    const s = b.s;
     if (!timing && s > gate && nextSplit === 0 && runTime === 0) timing = true;
     if (timing) runTime += dt;
     if (timing && nextSplit < splitsAt.length && s >= splitsAt[nextSplit]) {

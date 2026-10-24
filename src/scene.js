@@ -51,6 +51,7 @@ export function followWithSun(sun, x, y, z) {
 
 // Two rows of cone mountains beyond the bottom of the trail; the far row has snow caps.
 export function buildMountains(scene, trail, random) {
+  const bottom = trail.downhillAt(trail.length); // how far down the hill the trail ends
   const far = new THREE.MeshBasicMaterial({ color: 0xa6b6c0, fog: false });
   const near = new THREE.MeshBasicMaterial({ color: 0x7f9199, fog: false });
   const snow = new THREE.MeshBasicMaterial({ color: 0xeef2f4, fog: false });
@@ -66,6 +67,6 @@ export function buildMountains(scene, trail, random) {
       scene.add(cap);
     }
   };
-  for (let i = 0; i < 14; i++) add(-900 + i * 140 + random() * 60, -(trail.length + 650 + random() * 250), -420, 320 + random() * 260, 180 + random() * 90, far, random() < 0.6);
-  for (let i = 0; i < 10; i++) add(-700 + i * 150 + random() * 50, -(trail.length + 380 + random() * 120), -400, 200 + random() * 150, 150 + random() * 70, near, false);
+  for (let i = 0; i < 14; i++) add(-900 + i * 140 + random() * 60, -(bottom + 650 + random() * 250), -420, 320 + random() * 260, 180 + random() * 90, far, random() < 0.6);
+  for (let i = 0; i < 10; i++) add(-700 + i * 150 + random() * 50, -(bottom + 380 + random() * 120), -400, 200 + random() * 150, 150 + random() * 70, near, false);
 }

@@ -1,73 +1,79 @@
 // defineTrail() turns trail data (see src/trails/hardline.js) into the functions the game
-// uses: where the centreline is, how wide the trail is, how high the ground is, and what's
-// on it. It checks the data first and explains any mistake in plain words.
+// uses: where the trail goes, how wide it is, how high the ground is, and what's on it.
+// It checks the data first and explains any mistake in plain words.
 // Plain maths only (no Three.js), so tests can run it in Node.
 //
-// Conventions: s = distance down the trail (m), off = sideways offset from the centreline
-// (m, +x side positive). For now s is measured straight down the hill (world z = -s);
-// roadmap step 2b changes it to follow the winding path. See CLAUDE.md.
+// Conventions (see CLAUDE.md): s = distance ALONG the winding trail (m); off = sideways
+// offset, square to the trail (m, positive to the rider's right); d = distance straight
+// down the hill (world z = -d), which is what the hill and the centreline waves use.
+//
+// The ground has two parts that blend together:
+//  - near the trail: the riding line (hill under the centreline + jumps), worn into a
+//    shallow dish, with berm walls and banks rising either side, as in v1;
+//  - further out: the hill itself, which depends only on world position, so the inside of
+//    a tight bend can never become a cliff. Each jump's drop is built into the hill as a
+//    gentle terrace, so trail and hill stay level with each other.
 import { clamp, smoothstep } from './util.js';
 import { resolveJump, jumpProfile, SHAPE_KEYS } from './jumps.js';
+import { createPath } from './path.js';
 
 export const SPLIT_COUNT = 4; // 3 splits + the finish: one high-score board each
 
 // Shape of the ground beside the trail (the same on every trail for now).
-const DISH_DEPTH = 0.1;          // the trail is worn into a shallow dish this deep (m)
+const DISH_DEPTH = 0.1;           // the trail is worn into a shallow dish this deep (m)
+const BANK_RISE = 0.18;           // banks rise 0.18 * (metres past the edge)^1.25 either side...
+const BANK_LEVEL_FROM = 50, BANK_LEVEL_SPAN = 16; // ...then level off from 50 m out (to about 34 m high, v1's highest)
+const BLEND_START = 6, BLEND_END = 20; // past the trail edge, the ground blends into the hill (m)
+export const NEAR_REACH = BLEND_END + 6; // how far past the edge the detailed ground mesh goes
 const BERM_FADE_BEFORE_JUMP = 20; // berms fade out from this far before a kicker (m)...
 const BERM_FADE_LENGTH = 8;       // ...over this distance, and back in after the landing
 const BERM_ADJUST_FADE = 5;       // a berm adjustment blends in and out over this distance (m)
+const PATH_MARGIN = 120;          // the path is measured this far beyond each end (m)
 
-// A list of sine waves { amp, period, phase }: the sum of amp * sin(s / period + phase).
-// Returns the sum and its first and second derivatives.
-function sineWaves(list) {
-  const ws = list.map(w => ({ amp: w.amp, period: w.period, phase: w.phase || 0 }));
-  return {
-    at(s) { let v = 0; for (const w of ws) v += w.amp * Math.sin(s / w.period + w.phase); return v; },
-    slope(s) { let v = 0; for (const w of ws) v += w.amp / w.period * Math.cos(s / w.period + w.phase); return v; },
-    bend(s) { let v = 0; for (const w of ws) v += -w.amp / (w.period * w.period) * Math.sin(s / w.period + w.phase); return v; },
-  };
-}
+const waveList = list => (list || []).map(w => ({ amp: w.amp, period: w.period, phase: w.phase || 0 }));
+const sumWaves = (ws, t) => { let v = 0; for (const w of ws) v += w.amp * Math.sin(t / w.period + w.phase); return v; };
 
 export function defineTrail(data) {
   checkTrail(data);
   const { length, splits, start } = data;
-  const centre = sineWaves(data.centreline);
-  const widthWaves = data.width.waves.map(w => ({ amp: w.amp, period: w.period, phase: w.phase || 0 }));
-  const profileWaves = (data.profile.waves || []).map(w => ({ amp: w.amp, period: w.period, phase: w.phase || 0 }));
-  const chutes = data.profile.chutes || [];
+  const path = createPath(data.centreline, -PATH_MARGIN, length + PATH_MARGIN * 2);
+  checkBends(data, path);
+  const widthWaves = waveList(data.width.waves);
+  const hillWaves = waveList(data.hill.waves);
+  const chutes = data.hill.chutes || [];
   const jumps = data.features.filter(f => f.type === 'jump').map(resolveJump).sort((a, b) => a.s - b.s);
   const berms = { auto: true, adjust: [], ...data.berms };
   const bermRamp = berms.fullCurvature - berms.startCurvature;
+  const bankWidth = (data.width.min + data.width.max) / 2; // typical half width, for the far banks
 
-  // Centreline x position, and its first and second derivatives (for heading and curvature).
-  const cx = centre.at, cxd = centre.slope, cxdd = centre.bend;
+  // Half the trail width (m), along the trail.
+  const halfWidth = s => clamp(data.width.base + sumWaves(widthWaves, s), data.width.min, data.width.max);
+  const curvature = s => path.curvatureAt(s);
 
-  // Half the trail width (m).
-  function halfWidth(s) {
-    let h = data.width.base;
-    for (const w of widthWaves) h += w.amp * Math.sin(s / w.period + w.phase);
-    return clamp(h, data.width.min, data.width.max);
+  // How much lower the trail is after jump j, ramping in across the jump (0 before it).
+  const terrace = (j, s) => (j.knuck - j.drop) * smoothstep((s - (j.s - j.kick)) / (j.end - (j.s - j.kick)));
+
+  // The hill, at downhill distance d: grade, gentle waves, steeper chutes, and jump terraces.
+  function hillBase(d) {
+    let h = data.hill.grade * d + sumWaves(hillWaves, d);
+    for (const c of chutes) h += c.grade * clamp(d - c.from, 0, c.to - c.from);
+    return h;
   }
-
-  // Signed curvature of the centreline (1/m), using the proper formula cx'' / (1 + cx'^2)^1.5.
-  function curvature(s) {
-    const d = cxd(s);
-    return cxdd(s) / Math.pow(1 + d * d, 1.5);
-  }
-
-  // Height of the trail's centreline before jumps and berms: steady grade, gentle waves, chutes.
-  function profileHeight(s) {
-    let h = data.profile.grade * s;
-    for (const w of profileWaves) h += w.amp * Math.sin(s / w.period + w.phase);
-    for (const c of chutes) h += c.grade * clamp(s - c.from, 0, c.to - c.from);
+  function hillHeight(d) {
+    let h = hillBase(d);
+    if (jumps.length) { const s = path.pathAt(d); for (const j of jumps) h += terrace(j, s); }
     return h;
   }
 
+  // Height the jumps add along the trail (kickers, gaps, landings and their drops).
   function jumpHeight(s) {
     let h = 0;
     for (const j of jumps) h += jumpProfile(j, s - j.s);
     return h;
   }
+
+  // Height of the riding line on the centreline, before the dish and berms.
+  const lineHeight = s => hillBase(path.downhillAt(s)) + jumpHeight(s);
 
   // If s is on a kicker, returns the jump and u (metres before the lip, negative). Otherwise null.
   function kickerAt(s) {
@@ -125,32 +131,53 @@ export function defineTrail(data) {
     return b * (1 - 0.6 * smoothstep((outside - w) / 2.5));
   }
 
-  // Ground height at distance s down the trail and sideways offset off.
-  function ground(s, off) {
-    let h = profileHeight(s) + jumpHeight(s);
-    const a = Math.abs(off), w = halfWidth(s);
-    h += bermHeight(s, off, w);
-    if (a > w) {
-      // off the trail the hillside rises away, with gentle lumps
-      const e = a - w;
-      h += Math.pow(e, 1.25) * 0.18 + 0.25 * Math.sin(s * 0.31 + off * 0.7) * Math.min(1, e / 2);
-    } else {
-      h -= DISH_DEPTH * (1 - (a / w) * (a / w));
-    }
-    return h;
+  // Height of the banks e metres past the trail edge: v1's rise, levelling off further out.
+  function bankRise(e) {
+    const eased = e < BANK_LEVEL_FROM ? e : BANK_LEVEL_FROM + BANK_LEVEL_SPAN * Math.tanh((e - BANK_LEVEL_FROM) / BANK_LEVEL_SPAN);
+    return Math.pow(eased, 1.25) * BANK_RISE;
   }
 
-  // Same as ground(), from world x and z.
-  const groundAt = (x, z) => {
-    const s = -z;
-    return ground(s, x - cx(s));
-  };
+  // Ground height at path position (s, off), which is world point (x, z).
+  function surface(s, off, x, z) {
+    const a = Math.abs(off), w = halfWidth(s);
+    const toHill = smoothstep((a - w - BLEND_START) / (BLEND_END - BLEND_START));
+    let near = 0, far = 0;
+    if (toHill < 1) {
+      near = lineHeight(s) + bermHeight(s, off, w);
+      if (a > w) {
+        // off the trail the banks rise away, with gentle lumps
+        const e = a - w;
+        near += bankRise(e) + 0.25 * Math.sin(s * 0.31 + off * 0.7) * Math.min(1, e / 2);
+      } else {
+        near -= DISH_DEPTH * (1 - (a / w) * (a / w));
+      }
+    }
+    if (toHill > 0) {
+      const d = -z, e = Math.max(0, a - bankWidth);
+      far = hillHeight(d) + bankRise(e) + 0.25 * Math.sin(d * 0.31 + x * 0.7);
+    }
+    return near + (far - near) * toHill;
+  }
+
+  // Ground at path position (s, off). Near the trail this is the same as groundAt() there.
+  function ground(s, off) {
+    const p = path.pointAt(s, off);
+    return surface(s, off, p.x, p.z);
+  }
+
+  // Ground at world position (x, z).
+  function groundAt(x, z) {
+    const at = path.locate(x, z);
+    return surface(at.s, at.off, x, z);
+  }
 
   return {
     id: data.id, name: data.name, length, seed: data.seed, splits, start,
     scenery: { rocky: [], ...data.scenery }, jumps, berms,
-    cx, cxd, cxdd, curvature, halfWidth, profileHeight, jumpHeight, kickerAt, jumpZone,
+    halfWidth, curvature, hillHeight, jumpHeight, lineHeight, kickerAt, jumpZone,
     bermAmount, bermHeight, ground, groundAt,
+    pointAt: path.pointAt, headingAt: path.headingAt, locate: path.locate,
+    downhillAt: path.downhillAt, pathAt: path.pathAt,
   };
 }
 
@@ -181,10 +208,10 @@ function checkTrail(data) {
   if (!(w.min > 0 && w.min < w.max)) fail('width min must be above 0 and below max');
   checkWaves(w.waves || [], 'width');
 
-  const p = data.profile || {};
-  if (!isNumber(p.grade)) fail('profile needs a grade, like -0.2 (downhill)');
-  checkWaves(p.waves || [], 'profile');
-  (p.chutes || []).forEach(c => {
+  const h = data.hill || {};
+  if (!isNumber(h.grade)) fail('hill needs a grade, like -0.2 (downhill)');
+  checkWaves(h.waves || [], 'hill');
+  (h.chutes || []).forEach(c => {
     if (!isNumber(c.from) || !isNumber(c.to) || !isNumber(c.grade) || c.to <= c.from) fail(`chute needs from < to and a grade (got ${JSON.stringify(c)})`);
   });
 
@@ -229,5 +256,17 @@ function checkTrail(data) {
   jumps.sort((a, c) => a.s - c.s);
   for (let i = 1; i < jumps.length; i++) {
     if (jumps[i].s - jumps[i].kick <= jumps[i - 1].end) fail(`jump at ${jumps[i].s} starts before the landing of the jump at ${jumps[i - 1].s} ends`);
+  }
+}
+
+// The detailed ground beside the trail reaches NEAR_REACH past the edge. On the inside of a
+// bend tighter than that, it would fold over itself, so such bends are refused.
+function checkBends(data, path) {
+  const need = data.width.max + NEAR_REACH + 4;
+  for (let s = 0; s <= data.length; s += 0.5) {
+    const k = Math.abs(path.curvatureAt(s));
+    if (k > 0 && 1 / k < need) {
+      throw new Error(`Trail "${data.id}": the bend at ${s.toFixed(0)} m is too tight (radius ${(1 / k).toFixed(0)} m; at least ${need.toFixed(0)} m for now). Make the centreline waves gentler there.`);
+    }
   }
 }

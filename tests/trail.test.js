@@ -17,7 +17,7 @@ const rejects = (changes, message) => assert.throws(() => defineTrail(variant(ch
 
 test('the Hardline trail data is accepted', () => {
   const trail = defineTrail(hardline);
-  assert.equal(trail.length, 1200);
+  assert.equal(trail.length, 1297);
   assert.equal(trail.jumps.length, 4);
 });
 
@@ -25,7 +25,7 @@ test('mistakes in trail data are explained', () => {
   rejects({ id: '' }, /needs an id/);
   rejects({ splits: [300, 600, 1200] }, /exactly 4 splits/);
   rejects({ splits: [300, 900, 600, 1200] }, /splits must go down the trail/);
-  rejects({ splits: [300, 600, 900, 1100] }, /must be at the trail length \(1200\)/);
+  rejects({ splits: [300, 600, 900, 1100] }, /must be at the trail length \(1297\)/);
   rejects({ start: { spawn: 9, gate: 8 } }, /spawn before the gate/);
   rejects({ width: { base: 3, waves: [], min: 5, max: 4 } }, /width min must be above 0 and below max/);
   rejects({ centreline: [{ amp: 22, period: 0 }] }, /centreline wave 1 needs/);
@@ -33,11 +33,17 @@ test('mistakes in trail data are explained', () => {
   rejects({ features: [{ type: 'jump', at: 300, kind: 'mega' }] }, /jump at 300: unknown jump kind "mega"/);
   rejects({ features: [{ type: 'jump', at: 300, kind: 'normal', gap: 8 }] }, /must declare its own landings/);
   rejects({ features: [{ type: 'jump', at: 5, kind: 'normal' }] }, /kicker starts before the start gate/);
-  rejects({ features: [{ type: 'jump', at: 1180, kind: 'normal' }] }, /runs past the end of the trail/);
+  rejects({ features: [{ type: 'jump', at: 1280, kind: 'normal' }] }, /runs past the end of the trail/);
   rejects({ features: [{ type: 'jump', at: 300, kind: 'normal' }, { type: 'jump', at: 320, kind: 'normal' }] },
     /jump at 320 starts before the landing of the jump at 300 ends/);
   rejects({ berms: { auto: true, startCurvature: 0.02, fullCurvature: 0.01, height: 1.7 } }, /startCurvature below fullCurvature/);
   rejects({ berms: { ...hardline.berms, adjust: [{ from: 660, to: 600, height: 1 }] } }, /berm adjustment needs from < to/);
+  rejects({ hill: { waves: [] } }, /hill needs a grade/);
+});
+
+test('bends too tight for the ground beside the trail are refused, saying where', () => {
+  // a 15 m wiggle every 47 m makes corners of about 7.5 m radius
+  rejects({ centreline: [{ amp: 30, period: 15 }] }, /the bend at \d+ m is too tight \(radius \d+ m; at least 35 m for now\)/);
 });
 
 test('a reshaped jump is accepted once it declares its own landing ranges', () => {
@@ -69,7 +75,7 @@ test('berm adjustments change only their stretch, blending in and out over 5 m',
 
 test('berms can be switched off for a whole trail', () => {
   const flat = defineTrail(variant({ berms: { auto: false } }));
-  for (let s = 0; s < 1200; s += 3) assert.equal(flat.bermAmount(s), 0);
+  for (let s = 0; s < 1297; s += 3) assert.equal(flat.bermAmount(s), 0);
 });
 
 /* ---------- A second, made-up trail ---------- */
@@ -77,7 +83,7 @@ const MINI = defineTrail({
   id: 'mini', name: 'Mini test trail', length: 600, seed: 7,
   centreline: [{ amp: 10, period: 60 }],
   width: { base: 4.5, waves: [{ amp: 0.5, period: 40 }], min: 4, max: 5 },
-  profile: { grade: -0.15 },
+  hill: { grade: -0.15 },
   berms: { auto: true, startCurvature: 0.004, fullCurvature: 0.008, height: 1.2 },
   start: { spawn: 2, gate: 8 },
   splits: [140, 300, 450, 600],
@@ -88,16 +94,17 @@ const MINI = defineTrail({
 test('a second trail builds its own terrain and forest', () => {
   const random = makeRandom(MINI.seed);
   const terrain = terrainData(MINI, random);
-  // the terrain mesh covers this trail's length (plus 20 m above and 80 m below), not Hardline's
-  const zs = []; for (let i = 2; i < terrain.positions.length; i += 3) zs.push(-terrain.positions[i]);
-  assert.equal(Math.min(...zs), -20);
-  assert.equal(Math.max(...zs), 680);
+  // the detailed strip follows this trail from 20 m above its start to 80 m past its finish
+  const first = MINI.locate(terrain.positions[0], terrain.positions[2]);
+  const n = terrain.positions.length / 3 - 1, last = MINI.locate(terrain.positions[n * 3], terrain.positions[n * 3 + 2]);
+  // (positions are stored as 32-bit floats, so allow 1 cm)
+  assert.ok(Math.abs(first.s + 20) < 0.01 && Math.abs(last.s - 680) < 0.01, `strip runs ${first.s} to ${last.s}`);
   const forest = planForest(MINI, random);
   // every crashable tree stands beside this trail, off the riding line
   for (const t of Object.values(forest.treeBuckets).flat()) {
-    const s = -t.z;
-    assert.ok(s > -11 && s < 670, `tree at ${s} is within the trail`);
-    assert.ok(Math.abs(t.x - MINI.cx(s)) > MINI.halfWidth(s) + 1.2, `tree at ${s} is off the trail`);
+    const at = MINI.locate(t.x, t.z);
+    assert.ok(at.s > -15 && at.s < 680, `tree at ${at.s} is along this trail`);
+    assert.ok(Math.abs(at.off) > MINI.halfWidth(at.s) + 1.2, `tree at ${at.s} is off the trail`);
   }
 });
 
@@ -108,10 +115,10 @@ test('the physics rides a second trail: follows its line, clears its jump, reach
   const b = createBikeState(), keys = { left: false, right: false, pedal: false, brake: false, hop: false };
   placeBikeAt(b, MINI, MINI.start.spawn, 0);
   const seen = [];
-  for (let step = 0; step < 120 * 60 && -b.z < MINI.length; step++) {
+  for (let step = 0; step < 120 * 60 && b.s < MINI.length; step++) {
     // scripted rider: aim 8 m ahead on the centreline; hold about 55 km/h for the jump
-    const s = -b.z, ahead = s + 8;
-    let err = Math.atan2(MINI.cx(ahead) - b.x, b.z + ahead) - b.h;
+    const s = b.s, target = MINI.pointAt(s + 8);
+    let err = Math.atan2(target.x - b.x, b.z - target.z) - b.h;
     err = Math.atan2(Math.sin(err), Math.cos(err));
     keys.right = err > 0.03; keys.left = err < -0.03;
     keys.pedal = b.v < 10; keys.brake = b.v > 15.5;
@@ -119,9 +126,10 @@ test('the physics rides a second trail: follows its line, clears its jump, reach
     for (const e of events) seen.push(e.type === 'toast' ? e.text : e.type === 'crash' ? 'crash: ' + e.reason : e.type);
     assert.ok(!events.some(e => e.type === 'crash'), `crashed at ${s.toFixed(0)} m: ${seen.join(' | ')}`);
     assert.ok(Number.isFinite(b.x + b.y + b.z + b.v), 'bike state stays finite');
-    assert.ok(Math.abs(b.x - MINI.cx(s)) < MINI.halfWidth(s), `stays on the trail at ${s.toFixed(0)} m`);
+    const at = MINI.locate(b.x, b.z);
+    assert.ok(Math.abs(at.off) < MINI.halfWidth(at.s), `stays on the trail at ${at.s.toFixed(0)} m`);
   }
-  assert.ok(-b.z >= MINI.length, `reached the finish (got to ${(-b.z).toFixed(0)} m)`);
+  assert.ok(b.s >= MINI.length, `reached the finish (got to ${b.s.toFixed(0)} m)`);
   assert.ok(seen.includes('Sweet landing') || seen.includes('Clean landing'), `landed the jump: ${seen.join(' | ')}`);
 });
 
