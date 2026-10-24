@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hardline MTB v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Extra+Condensed:wght@500;700&family=Archivo:wght@400;600&family=Press+Start+2P&family=VT323&display=swap">
+</head>
+<body>
+<canvas id="game" aria-label="Downhill mountain bike game view"></canvas>
+
+<div class="hud" aria-live="polite">
+  <div class="row">
+    <div class="stack">
+      <div class="panel"><div class="label">Run time</div><div class="big" id="time">0:00.00</div></div>
+      <div class="panel"><div class="label">Speed</div><div class="mid" id="speed">0 km/h</div>
+        <div class="grip" aria-hidden="true"><div class="grip-fill" id="gripFill"></div></div><div class="label grip-label" id="gripLabel">Grip used</div></div>
+    </div>
+    <div class="panel split"><div class="label" id="splitLabel">Split 0 of 4</div><div class="mid" id="splitDelta">--</div></div>
+  </div>
+  <div class="pads" id="pads">
+    <div class="cluster">
+      <button class="pad" data-key="left" aria-label="Lean left"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button class="pad" data-key="right" aria-label="Lean right"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+    </div>
+    <div class="cluster">
+      <button class="pad" data-key="hop">Hop</button>
+      <button class="pad tall" data-key="brake">Brake</button>
+      <button class="pad tall" data-key="pedal">Pedal</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<div class="screen" id="startScreen">
+  <div class="card">
+    <h1>Hardline <span>MTB</span></h1>
+    <p>1.2 km rainforest descent, four jumps, four timed splits.</p>
+    <p id="pbLine"></p>
+    <button class="btn" id="startBtn">Drop in</button>
+    <div class="scoreboard" data-tab="3"></div>
+    <details class="howto">
+      <summary>How to ride</summary>
+      <div class="howto-body">
+        <div class="keys kb">
+          <b>W / Up</b><span>Pedal (only helps below about 45 km/h)</span>
+          <b>S / Down</b><span>Brake</span>
+          <b>A D / Left Right</b><span>Lean to steer. Hold longer to lean harder; tap for small corrections</span>
+          <b>Space</b><span>Hold to compress, release to hop. Release right at a jump lip to pop</span>
+          <b>R</b><span>End the run and see the high scores</span>
+          <b>Enter</b><span>Drop in</span>
+        </div>
+        <p class="fine-only" id="touchHint">Lean with the arrows on the left. Pedal, brake and hop on the right.</p>
+        <p><strong>Crashes.</strong> A small crash puts you back on the bike where you fell and the clock keeps running. A big crash (hitting a tree fast or casing a jump hard) sends you back to the top with the clock reset.</p>
+        <p><strong>Corners.</strong> The tight ones have berms. Ride high on the berm wall and it holds you in at speed. Lean hard on flat dirt and the tyres let go and you drift wide. Drift up into a berm and it catches you and swings you back round the corner. Watch the grip bar under your speed.</p>
+        <p><strong>Jumps.</strong> Land between the green flags for a smooth landing. Green to amber is the buffer, where your suspension works harder. Short of the amber flags you case it; past them you flat-land and bottom out. Normal jumps land smooth at about 46 to 68 km/h on the lip.</p>
+        <p><strong>Big jumps</strong> have an orange sign before them. Hold Space up the kicker and release at the lip to pop; you'll reach the sweet spot at about 52 to 64 km/h. Without a pop you case it. The big jump after split 1 doesn't need a pop above about 52 km/h; pop it if you're slower.</p>
+      </div>
+    </details>
+  </div>
+</div>
+
+<div class="screen" id="finishScreen" hidden>
+  <div class="card">
+    <div class="label" id="endLabel">Finish</div>
+    <div class="result" id="finalTime">0:00.00</div>
+    <p id="endNote"></p>
+    <form id="nameForm" novalidate hidden>
+      <div class="newhs">New high score!</div>
+      <p id="hsList" class="hs-note"></p>
+      <label class="form-label" for="nameInput">Enter your name</label>
+      <div class="namerow"><input id="nameInput" maxlength="10" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="nameErr"><button class="btn" type="submit">Save</button></div>
+      <div class="err" id="nameErr" hidden>Type a name first, up to 10 letters or numbers.</div>
+    </form>
+    <button class="btn" id="againBtn">Ride again</button>
+    <div class="scoreboard" data-tab="3"></div>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

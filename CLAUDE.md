@@ -13,16 +13,17 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 
 ## Commands
 
-- `npm install` then `npm run dev` - local dev server (Vite). The v1 game is playable at `/v1.html`.
+- `npm install` then `npm run dev` - local dev server (Vite). v1 is at `/v1.html`, v2 at `/v2.html`.
 - `npm test` - physics and jump-range tests (Node's built-in test runner, no extra deps).
 - `npm run build` - production build into `dist/`.
 
 ## Repository layout
 
 - `public/v1.html` - **reference build**: the complete v1 game in one file, exactly as it was when ported from claude.ai. Treat it as the behavioural spec. Do not edit it; copy logic out of it into `src/`.
-- `src/` - the modular v2 game (to be created, see Roadmap).
+- `v2.html` + `src/` - the modular v2 game. `src/main.js` wires it together; each module's header says what it does. `src/trail.js` and the pure parts of `terrain.js`, `forest.js` and `physics.js` have no DOM, so tests run them in Node.
+- `index.html` - home page linking to v1 and v2.
 - `tools/jump-sim.js` - straight-line jump simulator shared by tests and tuning.
-- `tests/` - `node:test` tests.
+- `tests/` - `node:test` tests. `track`, `forest` and `physics` tests read v1's own code out of `public/v1.html` and check v2 gives identical results (physics: every bike value at every step of scripted rides).
 - `docs/v2-trailhead-spec.md` - the agreed design for the next version.
 
 ## v1 state (what already works)
@@ -81,13 +82,15 @@ Jump profiles live in `tools/jump-sim.js` and are pinned by tests. Current tuned
 
 - Terrain triangle winding must give upward normals (`a, b, d, b, e, d`), or the ground is back-face culled and invisible.
 - `InstancedMesh` needs `frustumCulled = false` (r128 culls on the base geometry's bounds); visibility is managed by distance chunks instead.
-- Hex colours are used as-is (no sRGB output encoding).
+- Hex colours are used as-is (no sRGB output encoding). On three 0.160 this needs `ColorManagement.enabled = false` (in `src/three.js`, which every module imports Three.js through) and `renderer.outputColorSpace = LinearSRGBColorSpace`.
+- Light intensities are v1's values x pi. Since r155 Three.js lights scenes pi times dimmer for the same number; for hemisphere and directional lights x pi is exactly r128's look. Don't use the deprecated `useLegacyLights` instead (warns every load, removed in r165).
+- Terrain colour noise, forest and mountains share one seeded random sequence in that order. Changing the order or the number of `random()` calls moves every tree (`tests/forest.test.js` catches it).
 - The game must keep working at phone width with touch controls; no `alert`/`prompt`; text input must not trigger game keys.
 - The v1 shared scoreboard used the claude.ai artifact database (`window.claude.use('db')`). That does not exist outside claude.ai. v2 uses localStorage behind a small storage interface so a shared backend can be added later.
 
 ## Roadmap for v2 (do these in order, one PR-sized step each)
 
-1. **Scaffold**: Vite + `three` from npm. Split v1 into ES modules (`terrain`, `trail`, `forest`, `bike`, `rider`, `physics`, `camera`, `hud`, `input`, `scores`, `main`). Behaviour must match `public/v1.html`. Tests pass.
+1. **Scaffold** (done): Vite + `three` from npm. Split v1 into ES modules (`terrain`, `trail`, `forest`, `bike`, `rider`, `physics`, `camera`, `hud`, `input`, `scores`, `main`). Behaviour must match `public/v1.html`. Tests pass.
 2. **Trail as data**: replace hard-coded globals with a `Trail` definition (centreline, width function, features list: jumps, berms, rollers, splits). v1's track becomes the first `Trail`. Physics and mesh read only from the `Trail`.
 3. **Trailhead**: see spec. Three start gates; riding through one selects that trail.
 4. **Jolly Green Giant** (green): rollers + pump mechanic.

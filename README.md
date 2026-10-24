@@ -2,14 +2,14 @@
 
 A downhill mountain bike game for the browser, built with Three.js.
 
-## Play the v1 game
+## Play locally
 
 ```
 npm install
 npm run dev
 ```
 
-Then open the address Vite prints and go to `/v1.html`.
+Then open the address Vite prints: `/v1.html` is the original game, `/v2.html` is the new version being built.
 
 ## Run the tests
 
@@ -17,7 +17,7 @@ Then open the address Vite prints and go to `/v1.html`.
 npm test
 ```
 
-The tests run the jump simulator and check every jump still lands smoothly at the speeds we tuned it for.
+The tests check every jump still lands smoothly at the speeds we tuned it for, and that v2's track, forest and physics give exactly the same results as v1.
 
 ## Working on it with Claude Code
 
@@ -26,6 +26,6 @@ Open a terminal in this folder and run `claude`. Claude reads `CLAUDE.md` for th
 ## Play online (GitHub Pages)
 
 Every push to `main` runs `.github/workflows/deploy-pages.yml`: it runs the tests, builds with Vite and publishes `dist/` to
-https://bkhiron-dot.github.io/Hironic-games/ (v1 is at `/Hironic-games/v1.html`).
+https://bkhiron-dot.github.io/Hironic-games/ (v1 at `/Hironic-games/v1.html`, v2 at `/Hironic-games/v2.html`).
 
 One-off setup in GitHub: **Settings -> Pages -> Build and deployment -> Source: GitHub Actions**. Pages on a private repo needs a paid GitHub plan; the published site is public either way.

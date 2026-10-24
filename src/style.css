@@ -1,0 +1,87 @@
+/* Hardline MTB styles, copied unchanged from v1 (public/v1.html). */
+[hidden]{display:none!important}
+body{margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+/* Layout: full-bleed 3D canvas, race-timing HUD pinned to the corners, touch pads along the bottom */
+:root{
+  --ink:#f3f1ea; --ink-dim:#b8c2bd; --panel:rgba(14,20,17,.76); --line:rgba(243,241,234,.16);
+  --accent:#e0672f; --ahead:#5fd38a; --behind:#ff7a66; --forest:#1d2e1f;
+  --display:"Saira Extra Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--forest);color:var(--ink);font-family:var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.hud{position:fixed;inset:0;pointer-events:none;padding:calc(12px + env(safe-area-inset-top,0px)) calc(12px + env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) calc(12px + env(safe-area-inset-left,0px));display:flex;flex-direction:column;justify-content:space-between}
+.row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.stack{display:flex;flex-direction:column;gap:8px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:7px 12px 8px;min-width:96px}
+.label{font:600 11px/1.3 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-dim)}
+.big{font:700 34px/1 var(--display);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.mid{font:700 24px/1 var(--display);font-variant-numeric:tabular-nums}
+.grip{margin-top:7px;height:5px;background:rgba(243,241,234,.14);border-radius:3px;overflow:hidden}
+.grip-fill{height:100%;width:0;background:var(--ahead);border-radius:3px}
+.grip-fill.warn{background:#f2a531} .grip-fill.slide{background:var(--behind)}
+.grip-label{margin-top:3px}
+.ahead{color:var(--ahead)} .behind{color:var(--behind)}
+.panel.split{text-align:right}
+.toast{position:fixed;left:50%;top:calc(84px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:0;padding:8px 14px;font:700 22px/1.1 var(--display);letter-spacing:.03em;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+.pads{display:none;justify-content:space-between;align-items:flex-end;gap:12px;pointer-events:none}
+.coarse .pads{display:flex}
+.cluster{display:flex;gap:12px;align-items:flex-end;pointer-events:auto}
+.pad{width:66px;height:66px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--ink);display:grid;place-items:center;font:600 12px var(--body);letter-spacing:.08em;text-transform:uppercase;touch-action:none}
+.pad.on{background:rgba(224,103,47,.55);border-color:var(--accent)}
+.pad svg{width:28px;height:28px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.pad.tall{height:84px;border-radius:33px}
+.screen{position:fixed;inset:0;display:grid;place-items:center;background:rgba(10,16,13,.55);padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.card{width:min(420px,100%);background:rgba(14,20,17,.92);border:1px solid var(--line);border-radius:10px;padding:22px 22px 20px;display:flex;flex-direction:column;gap:14px}
+.card h1{margin:0;font:700 46px/.95 var(--display);letter-spacing:.01em;text-wrap:balance}
+.card h1 span{color:var(--accent)}
+.card{max-height:calc(100vh - 48px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));max-height:calc(100dvh - 48px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow-y:auto;overscroll-behavior:contain}
+.howto{border-top:1px solid var(--line);padding-top:10px}
+.howto summary{cursor:pointer;font:600 13px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-dim);list-style:none;display:flex;justify-content:space-between;align-items:center;padding:4px 0}
+.howto summary::-webkit-details-marker{display:none}
+.howto summary::after{content:"+";font:700 20px/1 var(--display);color:var(--ink)}
+.howto[open] summary::after{content:"\2212"}
+.howto summary:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.howto-body{display:flex;flex-direction:column;gap:12px;padding-top:10px}
+.howto-body strong{color:var(--ink);font-weight:600}
+.screen{overflow:hidden}
+.card p{margin:0;color:var(--ink-dim);font-size:14px;line-height:1.55}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:13px;color:var(--ink-dim)}
+.keys b{font:600 12px var(--body);color:var(--ink);background:rgba(243,241,234,.08);border:1px solid var(--line);border-radius:4px;padding:2px 7px;justify-self:start;white-space:nowrap}
+.btn{appearance:none;border:0;border-radius:6px;background:var(--accent);color:#1a0d06;font:700 22px/1 var(--display);letter-spacing:.05em;text-transform:uppercase;padding:14px 16px;cursor:pointer}
+.btn:focus-visible,.pad:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stats .panel{min-width:0}
+.result{font:700 64px/1 var(--display);font-variant-numeric:tabular-nums}
+.coarse .kb{display:none}
+.fine-only{display:none}
+/* arcade high-score board */
+.scoreboard{background:#07100c;border:2px solid #2c3a30;border-radius:6px;padding:12px 12px 10px;display:flex;flex-direction:column;gap:10px}
+.hs-title{font:400 13px/1.2 "Press Start 2P",ui-monospace,monospace;color:#f2c94c;text-align:center;letter-spacing:.06em}
+.hs-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.hs-tab{appearance:none;border:1px solid #2c3a30;background:transparent;color:var(--ink-dim);font:400 9px/1.2 "Press Start 2P",ui-monospace,monospace;padding:7px 2px;border-radius:3px;cursor:pointer}
+.hs-tab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#1a0d06}
+.hs-tab:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.hs-table{display:grid;grid-template-columns:auto 1fr auto;column-gap:14px;row-gap:1px;font:400 22px/1.05 "VT323",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.hs-row{display:contents}
+.hs-row span{padding:1px 0;color:#9fe3b0}
+.hs-row span:first-child{color:#6f8a77;text-align:right}
+.hs-row span:last-child{text-align:right}
+.hs-row.first span{color:#f2c94c}
+.hs-row.empty span{color:#3d5244}
+.hs-row.mine span{color:#fff;animation:blink 1s steps(2,start) infinite}
+@keyframes blink{to{opacity:.35}}
+.hs-note{font:400 12px/1.4 var(--body);color:var(--ink-dim);text-align:center}
+.newhs{font:400 12px/1.4 "Press Start 2P",ui-monospace,monospace;color:#f2c94c;text-align:center}
+.namerow{display:flex;gap:8px}
+.namerow input{flex:1;min-width:0;background:#07100c;border:2px solid #2c3a30;border-radius:4px;color:#fff;font:400 26px/1 "VT323",ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;padding:8px 10px}
+.namerow input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.namerow .btn{padding:10px 14px;font-size:20px}
+.form-label{font:600 12px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-dim)}
+.err{color:var(--behind);font-size:13px}
+#nameForm{display:flex;flex-direction:column;gap:8px}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}.hs-row.mine{animation:none}}
