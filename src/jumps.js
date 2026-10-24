@@ -37,17 +37,21 @@ export const JUMP_KINDS = {
       { pop: 3, from: 46, to: 54, outcome: 'smooth' },
     ],
   },
-  // Big jump that needs a pop: a full pop lands smooth at about 50-58 km/h; without one you
-  // case it below about 60 (flat out, 61+ km/h, it clears without a pop).
-  // Reshaped with Ben (tuning round 2): longer, higher take-off (12 m kicker, 1.8 m lip),
-  // lower knuckle (1.8 m, was 2.4), and a steeper landing (0.6, was 0.4) so it still lands
-  // at speeds riders can reach. Flags are where the game's landings touch down.
+  // Big step-down jump: high kicker, low knuckle, long steep landing. Clears without a pop
+  // from about 52 km/h (smooth to 62); slower than that, a full pop lands it (46-52).
+  // Shaped with Ben (tuning rounds 2 and 3): 12 m kicker, 2.2 m lip, 1.6 m knuckle, 10 m gap,
+  // and a long steep landing (48 m at 0.8, about 39 degrees) for a long sweet spot: smooth
+  // landings touch down anywhere from 11.5 to 28 m past the lip. The landing drops about 23 m
+  // more than the hill's grade, so riders come off it fast (about 76 km/h on Hardline).
+  // Flags are where the game's landings touch down.
   bigPop: {
-    big: true, kick: 12, lip: 1.8, gap: 11, hole: -1.2, knuck: 1.8, pitch: 0.6,
-    short: 10.8, sweet0: 12.0, sweet1: 23.5, long: 26,
+    big: true, popOptional: true, kick: 12, lip: 2.2, gap: 10, hole: -1.2, knuck: 1.6, pitch: 0.8, land: 48,
+    short: 9.8, sweet0: 11.5, sweet1: 28, long: 32.5,
     landings: [
-      { pop: 3, from: 50, to: 58, outcome: 'smooth' },
-      { pop: 0, from: 46, to: 60, outcome: 'not smooth' },
+      { pop: 3, from: 46, to: 52, outcome: 'smooth' },
+      { pop: 0, from: 52, to: 62, outcome: 'smooth' },
+      { pop: 0, from: 40, to: 44, outcome: 'big crash' }, // too slow, no pop: cased
+      { pop: 3, from: 60, to: 64, outcome: 'big crash' }, // too fast with a pop: overshot
     ],
   },
 };
