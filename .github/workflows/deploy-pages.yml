@@ -23,12 +23,6 @@ permissions:
   id-token: write
   pull-requests: write
 
-# Only one publish at a time; a newer one replaces a queued one. Every run builds the whole
-# site (main plus all current previews), so the latest run is always complete.
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
 jobs:
   build:
     # pull request events only matter for pull requests that have (or just lost) the label
@@ -37,6 +31,13 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'preview') ||
       github.event.label.name == 'preview'
     runs-on: ubuntu-latest
+    # One build at a time; a newer one replaces an older one. Every build makes the whole site
+    # (main plus all current previews), so the newest is always complete. This is set on the
+    # job, not the workflow, so a pull request run that is skipped (no preview label) never
+    # joins the queue and can't cancel a publish of main.
+    concurrency:
+      group: pages-build
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,6 +58,10 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # publishes queue up in order; one is never cut off halfway
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
