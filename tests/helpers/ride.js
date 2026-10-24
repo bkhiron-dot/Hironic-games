@@ -45,7 +45,7 @@ export function rideJump(j, lipKmh, pop) {
 // A whole run from the start: hold a sensible speed for each section (below 58 km/h between
 // jumps, mid-range at each lip, popping where the jump needs it) and steer along the trail.
 // Returns { crash, splitsPassed, landings, time }.
-const LIP_PLAN = { normal: { kmh: 56, pop: 0 }, popOptional: { kmh: 60, pop: 0 }, bigPop: { kmh: 56, pop: 0 } };
+const LIP_PLAN = { normal: { kmh: 56, pop: 0 }, popOptional: { kmh: 60, pop: 0 }, bigPop: { kmh: 60, pop: 3 } };
 export function rideTrail() {
   const b = createBikeState(), keys = { left: false, right: false, pedal: false, brake: false, hop: false };
   placeBikeAt(b, T, T.start.spawn, 0);
