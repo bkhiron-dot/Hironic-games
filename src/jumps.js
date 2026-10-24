@@ -28,7 +28,7 @@ export const JUMP_KINDS = {
   // Big jump that clears without a pop (smooth at about 52-66 km/h);
   // a full pop helps if you're slow (smooth at about 46-54 km/h).
   // Gap 8.5 m (was 9; tuning round 2) so the pop really is optional at the speeds riders reach
-  // (on Hardline, at most about 56 km/h at the lip). Flags are where the game's landings touch down.
+  // (on Flow Monster, at most about 56 km/h at the lip). Flags are where the game's landings touch down.
   popOptional: {
     big: true, popOptional: true, kick: 10, lip: 1.5, gap: 8.5, hole: -1.2, knuck: 1.2, pitch: 0.55, land: 42,
     short: 7.8, sweet0: 8.6, sweet1: 23.5, long: 28.5,
@@ -38,7 +38,7 @@ export const JUMP_KINDS = {
     ],
   },
   // Big jump that needs a pop, built for speed: a full pop at the lip lands smooth from about
-  // 54 to 66 km/h (on Hardline you reach the lip at up to about 62). Without a pop you case it.
+  // 54 to 66 km/h (on Flow Monster you reach the lip at up to about 62). Without a pop you case it.
   // Shaped with Ben (tuning rounds 2-4): 12 m kicker, 1.8 m lip, a long 12 m gap to a high
   // 2.4 m knuckle, and a long steep landing (48 m at 0.7), so a fast pop carries well out:
   // smooth landings touch down from 12.3 to 30.1 m past the lip.

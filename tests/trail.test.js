@@ -1,28 +1,29 @@
 // Trails as data: defineTrail() catches mistakes in trail files with a clear message,
 // berm adjustments work, and a second, made-up trail drives every part of the game
-// (terrain, forest, physics) with no trace of the Hardline track.
+// (terrain, forest, physics) with no trace of the Flow Monster track.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { defineTrail } from '../src/trail.js';
-import hardline from '../src/trails/hardline.js';
+import flowMonster from '../src/trails/flow-monster.js';
 import { makeRandom } from '../src/util.js';
 import { terrainData } from '../src/terrain.js';
 import { planForest } from '../src/forest.js';
 import { createBikeState, placeBikeAt, stepRide } from '../src/physics.js';
 
-// A copy of the Hardline data with some changes, for testing mistakes.
-const variant = changes => ({ ...structuredClone(hardline), ...changes });
+// A copy of the Flow Monster data with some changes, for testing mistakes.
+const variant = changes => ({ ...structuredClone(flowMonster), ...changes });
 const rejects = (changes, message) => assert.throws(() => defineTrail(variant(changes)), message);
 
-test('the Hardline trail data is accepted', () => {
-  const trail = defineTrail(hardline);
+test('the Flow Monster trail data is accepted', () => {
+  const trail = defineTrail(flowMonster);
   assert.equal(trail.length, 1297);
   assert.equal(trail.jumps.length, 4);
 });
 
 test('mistakes in trail data are explained', () => {
   rejects({ id: '' }, /needs an id/);
+  rejects({ difficulty: 'red' }, /difficulty must be one of green, blue, black/);
   rejects({ splits: [300, 600, 1200] }, /exactly 4 splits/);
   rejects({ splits: [300, 900, 600, 1200] }, /splits must go down the trail/);
   rejects({ splits: [300, 600, 900, 1100] }, /must be at the trail length \(1297\)/);
@@ -37,7 +38,7 @@ test('mistakes in trail data are explained', () => {
   rejects({ features: [{ type: 'jump', at: 300, kind: 'normal' }, { type: 'jump', at: 320, kind: 'normal' }] },
     /jump at 320 starts before the landing of the jump at 300 ends/);
   rejects({ berms: { auto: true, startCurvature: 0.02, fullCurvature: 0.01, height: 1.7 } }, /startCurvature below fullCurvature/);
-  rejects({ berms: { ...hardline.berms, adjust: [{ from: 660, to: 600, height: 1 }] } }, /berm adjustment needs from < to/);
+  rejects({ berms: { ...flowMonster.berms, adjust: [{ from: 660, to: 600, height: 1 }] } }, /berm adjustment needs from < to/);
   rejects({ hill: { waves: [] } }, /hill needs a grade/);
 });
 
@@ -54,14 +55,14 @@ test('a reshaped jump is accepted once it declares its own landing ranges', () =
 });
 
 test('berm adjustments change only their stretch, blending in and out over 5 m', () => {
-  const plain = defineTrail(hardline);
+  const plain = defineTrail(flowMonster);
   // find a stretch with a full berm, away from jumps
   let at = 0;
   for (let s = 20; s < 1180; s += 1) if (plain.bermAmount(s) > 1.6) { at = s; break; }
   assert.ok(at > 0, 'expected a full berm somewhere');
   const from = at + 3, to = at + 13; // starts just inside the full berm, so the blend-in is measurable
-  const removed = defineTrail(variant({ berms: { ...hardline.berms, adjust: [{ from, to, height: 0 }] } }));
-  const raised = defineTrail(variant({ berms: { ...hardline.berms, adjust: [{ from, to, height: 2.2 }] } }));
+  const removed = defineTrail(variant({ berms: { ...flowMonster.berms, adjust: [{ from, to, height: 0 }] } }));
+  const raised = defineTrail(variant({ berms: { ...flowMonster.berms, adjust: [{ from, to, height: 2.2 }] } }));
   for (let s = from; s <= to; s += 0.5) {
     assert.equal(removed.bermAmount(s), 0, `no berm at ${s}`);
     assert.ok(Math.abs(raised.bermAmount(s) - plain.bermAmount(s) * 2.2 / 1.7) < 1e-9, `taller berm at ${s}`);
@@ -80,7 +81,7 @@ test('berms can be switched off for a whole trail', () => {
 
 /* ---------- A second, made-up trail ---------- */
 const MINI = defineTrail({
-  id: 'mini', name: 'Mini test trail', length: 600, seed: 7,
+  id: 'mini', name: 'Mini test trail', difficulty: 'green', length: 600, seed: 7,
   centreline: [{ amp: 10, period: 60 }],
   width: { base: 4.5, waves: [{ amp: 0.5, period: 40 }], min: 4, max: 5 },
   hill: { grade: -0.15 },

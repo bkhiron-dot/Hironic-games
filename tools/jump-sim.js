@@ -30,7 +30,7 @@ function testTrailFor(j) {
     const at = LEAD_IN + j.kick, length = Math.ceil(at + j.gap + j.land + 60);
     const shape = Object.fromEntries(SHAPE_KEYS.map(k => [k, j[k]]));
     const trail = defineTrail({
-      id: 'jump-test', name: 'Jump test', length, seed: 1,
+      id: 'jump-test', name: 'Jump test', difficulty: 'blue', length, seed: 1,
       centreline: [], width: { base: 4, waves: [], min: 3, max: 5 }, hill: { grade: BASE_GRADE },
       berms: { auto: false }, start: { spawn: 1, gate: 2 },
       splits: [length - 3, length - 2, length - 1, length],

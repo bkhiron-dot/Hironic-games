@@ -1,10 +1,10 @@
 // The ground with s measured along the winding path (roadmap step 2b):
-// Hardline keeps v1's shape on the hill, the ground has no cliffs (even on the inside of the
+// Flow Monster keeps v1's shape on the hill, the ground has no cliffs (even on the inside of the
 // tightest bends), and the forest never grows on the trail.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { HARDLINE as T } from '../src/trails/index.js';
+import { FLOW_MONSTER as T } from '../src/trails/index.js';
 import { makeRandom } from '../src/util.js';
 import { terrainData } from '../src/terrain.js';
 import { planForest } from '../src/forest.js';
@@ -21,7 +21,7 @@ function loadV1Track() {
 // Is s on (or within `margin` of) a jump, from the start of its kicker to the end of its landing?
 const onJump = (s, margin) => T.jumps.some(j => s > j.s - j.kick - margin && s < j.end + margin);
 
-test('Hardline keeps v1 shape on the hill: same centreline, and the riding line at v1 height away from jumps', () => {
+test('Flow Monster keeps v1 shape on the hill: same centreline, and the riding line at v1 height away from jumps', () => {
   const v1 = loadV1Track();
   // The last jump was reshaped in tuning round 2 (lower knuckle, steeper landing), so after it
   // the trail sits lower than v1 by a fixed amount, but keeps v1's shape.

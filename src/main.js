@@ -1,7 +1,7 @@
 // Hardline MTB v2: builds the world, wires the parts together and runs the frame loop.
 import './style.css';
 import { makeRandom } from './util.js';
-import { HARDLINE } from './trails/index.js';
+import { FLOW_MONSTER } from './trails/index.js';
 import { createScene, buildMountains, followWithSun } from './scene.js';
 import { buildTerrain } from './terrain.js';
 import { planForest, buildForest } from './forest.js';
@@ -30,7 +30,7 @@ const { renderer, scene, camera, sun } = createScene(document.getElementById('ga
 
 // The world, built in v1's order. Terrain colours, forest and mountains share one
 // random sequence, so the order decides where every tree grows.
-const trail = HARDLINE;
+const trail = FLOW_MONSTER;
 const random = makeRandom(trail.seed);
 buildTerrain(scene, renderer, trail, random);
 const forestPlan = planForest(trail, random);

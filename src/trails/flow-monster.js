@@ -1,4 +1,4 @@
-// Hardline: the v1 track, as data. defineTrail() (src/trail.js) checks it and turns it
+// Flow Monster (blue): the v1 track, as data. defineTrail() (src/trail.js) checks it and turns it
 // into the functions the game uses.
 //
 // Distances along the trail (length, start, splits, jumps, rocky sections, berm
@@ -6,8 +6,9 @@
 // by distance straight down the hill, so the trail keeps v1's shape on the hill: it is
 // 1200 m straight down and 1297 m to ride.
 export default {
-  id: 'hardline',
-  name: 'Hardline',
+  id: 'flow-monster',
+  name: 'Flow Monster',
+  difficulty: 'blue', // green, blue or black: shown on the gates and the map
   length: 1297,
   seed: 20261024, // grows the forest; the same seed always gives the same trees
 

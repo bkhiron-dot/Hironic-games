@@ -1,6 +1,6 @@
-// Rides the game's own physics (src/physics.js) on the Hardline trail with a scripted rider.
+// Rides the game's own physics (src/physics.js) on the Flow Monster trail with a scripted rider.
 // Shared by tests/ride.test.js and tuning reports.
-import { HARDLINE as T } from '../../src/trails/index.js';
+import { FLOW_MONSTER as T } from '../../src/trails/index.js';
 import { makeRandom } from '../../src/util.js';
 import { terrainData } from '../../src/terrain.js';
 import { planForest } from '../../src/forest.js';
@@ -36,7 +36,7 @@ function rideLine(b, keys, kicker) {
   steerAlongTrail(b, keys);
 }
 
-// Ride one jump on Hardline so the bike reaches the lip at lipKmh, aiming the kicker at the
+// Ride one jump on Flow Monster so the bike reaches the lip at lipKmh, aiming the kicker at the
 // landing like a rider (the simulator's rider, tools/jump-sim.js). Returns { lipKmh, outcome, ... }.
 export function rideJump(j, lipKmh, pop) {
   return rideJumpOn(T, j, lipKmh, pop, (keys, b, kicker) => rideLine(b, keys, kicker));
