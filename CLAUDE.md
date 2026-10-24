@@ -21,11 +21,12 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 
 - `public/v1.html` - **reference build**: the complete v1 game in one file, exactly as it was when ported from claude.ai. Treat it as the behavioural spec. Do not edit it; copy logic out of it into `src/`.
 - `v2.html` + `src/` - the modular v2 game. `src/main.js` wires it together; each module's header says what it does. `src/trail.js`, `src/jumps.js` and the pure parts of `terrain.js`, `forest.js` and `physics.js` have no DOM, so tests run them in Node.
-- `src/trails/` - one data file per trail (`hardline.js` is the v1 track) and `index.js`, the list of trails. `defineTrail()` in `src/trail.js` checks the data and builds the trail's functions (`ground`, `halfWidth`, `kickerAt`, ...). Every module is handed the trail it works on; only `main.js` picks one.
+- `src/trails/` - one data file per trail (`hardline.js` is the v1 track) and `index.js`, the list of trails. `defineTrail()` in `src/trail.js` checks the data and builds the trail's functions (`ground`, `groundAt`, `pointAt`, `locate`, `halfWidth`, `kickerAt`, ...). Every module is handed the trail it works on; only `main.js` picks one.
+- `src/path.js` - the centreline as a measured path: distance along it, points square to it, and `locate(x, z)` to find any world point on it.
 - `src/jumps.js` - jump kinds (shape, landing flags, declared landing ranges). Trails place jumps by kind and may override numbers.
 - `index.html` - home page linking to v1 and v2.
 - `tools/jump-sim.js` - straight-line jump simulator shared by tests and tuning; reads shapes from `src/jumps.js`. `npm run jumps` prints every jump on every trail.
-- `tests/` - `node:test` tests. `track`, `forest` and `physics` tests read v1's own code out of `public/v1.html` and check v2 gives identical results (physics: every bike value at every step of scripted rides).
+- `tests/` - `node:test` tests. `ground.test.js` checks Hardline against v1's own code (read out of `public/v1.html`) away from jumps, and that the ground has no cliffs. `ride.test.js` rides the game's physics over every jump and the whole trail (`tests/helpers/ride.js`).
 - `docs/v2-trailhead-spec.md` - the agreed design for the next version.
 
 ## v1 state (what already works)
@@ -42,10 +43,11 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 
 ## Coordinate and track conventions
 
-- `s` = distance down the track (m), `off` = lateral offset from the centreline (m, +x side positive). **For now `s` is measured straight down the hill (world z), not along the winding path** (see Roadmap 2b).
-- World: `x = cx(s) + off`, `z = -s`, `y = ground(s, off)`. Rider travels toward -z.
+- `s` = distance ALONG the winding trail (m), so 100 m of `s` is 100 m of riding. `off` = sideways offset, square to the trail (m, positive to the rider's right). `d` = distance straight down the hill (world `z = -d`).
+- The centreline is laid out as sideways sine waves of `d`; `src/path.js` measures it. World point for (s, off): `trail.pointAt(s, off)`; height: `trail.ground(s, off)` or `trail.groundAt(x, z)`; back again: `trail.locate(x, z)`. Rider travels toward -z.
+- The hill is a function of world position (`d`) with each jump's drop built in as a terrace. Near the trail the ground is the riding line + dish + berms + banks; from 6 m past the edge it blends into the hill by 20 m, so tight bends can't make cliffs. Bends tighter than about 35 m radius are refused (the detailed ground would fold).
 - Heading `h`: forward vector `(sin h, 0, -cos h)`; right vector `(cos h, 0, sin h)`. Bike `rotation.y = -h`, rotation order `YXZ`.
-- Hardline (`src/trails/hardline.js`): centreline `cx(s) = 22 sin(s/45) + 8 sin(s/23 + 1)`; curvature uses the proper formula `cx'' / (1 + cx'^2)^1.5`. Base grade -0.2 (11 degrees) with a 7 m sine undulation and a steeper chute at 500-580 m.
+- Hardline (`src/trails/hardline.js`): centreline `x = 22 sin(d/45) + 8 sin(d/23 + 1)`, the same shape on the hill as v1; 1200 m straight down, 1297 m to ride. Hill grade -0.2 (11 degrees) with a 7 m sine undulation and a steeper chute 500-580 m down. Jumps at 177, 438, 743, 1037 m; splits at 326, 650, 974, finish 1297 m.
 
 ## Tuned physics (keep these unless Ben agrees a change)
 
@@ -54,6 +56,7 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 | Ground gravity | 9.8 m/s^2 | |
 | Air gravity | 15 m/s^2 | Deliberately 1.5 g for snappier, shorter jumps |
 | Rolling + drag | 0.12 + 0.0045 v^2 | Terminal about 75 km/h on base grade |
+| Air drag | 0.003 v^2 | In the air only (not in the jump simulator; see gotchas) |
 | Off-trail drag | 1.8 m/s^2 | |
 | Pedal | 3.0 m/s^2, fades out 8-13 m/s | Pedalling does not help at speed |
 | Brake | 8 m/s^2 | |
@@ -79,7 +82,17 @@ Jump shapes and their declared landing ranges live in `src/jumps.js` and are che
 | Big, needs pop (960 m) | 52-64 with full pop | lip 1.5 m, gap 12 m; cases without pop below about 66 |
 | Big, pop optional (410 m) | 52-66 no pop, 46-54 full pop | lip 1.5 m, gap 9 m, 42 m landing |
 
-Known mismatch (fixed by Roadmap 2b): because `s` runs straight down the hill, a jump on a diagonal is ridden longer than designed. The 170 m jump is ridden 15.5% long (7.0 m gap), so in the game it lands smooth at about 53-79 km/h, not 46-68. The other jumps are 1-3% long.
+Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diagonal) was ridden 15.5% long and landed smooth at about 53-79 km/h instead of 46-68. With `s` along the path it now lands smooth from 46 km/h in the game.
+
+Game vs simulator, smooth range at the lip (km/h, measured with `tests/helpers/ride.js` at 60 fps):
+
+| Jump | Pop | Game | Simulator |
+|---|---|---|---|
+| 177 m normal | none | 46-74 | 46-68 |
+| 438 m popOptional | none | 54-68 | 52-66 |
+| 438 m popOptional | full | 48-56 | 46-54 |
+| 743 m normal | none | 48-72 | 46-68 |
+| 1037 m bigPop | full | 58-68 | 52-64 |
 
 ## Known gotchas (learned the hard way)
 
@@ -87,7 +100,10 @@ Known mismatch (fixed by Roadmap 2b): because `s` runs straight down the hill, a
 - `InstancedMesh` needs `frustumCulled = false` (r128 culls on the base geometry's bounds); visibility is managed by distance chunks instead.
 - Hex colours are used as-is (no sRGB output encoding). On three 0.160 this needs `ColorManagement.enabled = false` (in `src/three.js`, which every module imports Three.js through) and `renderer.outputColorSpace = LinearSRGBColorSpace`.
 - Light intensities are v1's values x pi. Since r155 Three.js lights scenes pi times dimmer for the same number; for hemisphere and directional lights x pi is exactly r128's look. Don't use the deprecated `useLegacyLights` instead (warns every load, removed in r165).
-- Terrain colour noise, forest and mountains share one seeded random sequence in that order. Changing the order or the number of `random()` calls moves every tree (`tests/forest.test.js` catches it).
+- Terrain colour noise, forest and mountains share one seeded random sequence in that order; changing it moves every tree.
+- The forest floor colour is a smooth pattern of world position (`makeGroundNoise`), shared by the detailed strip and the hillside grid so their join doesn't show.
+- **Game physics depends on frame rate.** The physics steps once per frame (dt = frame time, capped at 1/30 s), so jump landings are detected up to a frame late. Measured smooth-range edges move by up to 4 km/h between 120 and 30 fps. Fix in the tuning round: a fixed physics step (e.g. 1/120 s).
+- **The jump simulator differs from the game** in three ways: time step (1/240 s vs the game's frame), no air drag, and pop timing (simulator: exactly at the lip; game: on the kicker just before it). Together these move range edges by up to 6 km/h (table above). `tests/ride.test.js` marks the two biggest gaps as TODO.
 - The game must keep working at phone width with touch controls; no `alert`/`prompt`; text input must not trigger game keys.
 - The v1 shared scoreboard used the claude.ai artifact database (`window.claude.use('db')`). That does not exist outside claude.ai. v2 uses localStorage behind a small storage interface so a shared backend can be added later.
 
@@ -96,7 +112,8 @@ Known mismatch (fixed by Roadmap 2b): because `s` runs straight down the hill, a
 1. **Scaffold** (done): Vite + `three` from npm. Split v1 into ES modules (`terrain`, `trail`, `forest`, `bike`, `rider`, `physics`, `camera`, `hud`, `input`, `scores`, `main`). Behaviour must match `public/v1.html`. Tests pass.
 2. **Trail as data**:
    - **2a** (done): `defineTrail()` + `src/trails/hardline.js`; every module is handed its trail; still matches v1 exactly. Berms are automatic per trail, with `berms.adjust` for a stretch. Jump simulator keeps a constant -0.2 grade (agreed; real profile moves ranges by 1 km/h at most).
-   - **2b** (next, agreed with Ben): `s` follows the winding path (true distance). Needs: a world-space hill so tight bends don't make cliffs (trail height = hill under it + features); terrain as a near-trail ribbon plus a hillside grid; forest regrown along the path; the v1-match tests retired and replaced by geometry tests and a game-vs-simulator jump test. Open decisions: Hardline layout (keep the same shape, 1297 m, recommended; or round numbers) and the hill model.
+   - **2b** (done): `s` follows the winding path. Hardline keeps v1's shape on the hill (1297 m to ride). World-space hill with jump terraces; detailed ground strip plus hillside grid; forest regrown along the path. v1 step-for-step tests retired; replaced by ground tests (v1 riding line away from jumps, no cliffs, no trees on the trail) and game-physics ride tests (every jump, and a full run).
+   - **Tuning round** (next): Ben's playtest notes, plus: fixed physics step so jumps don't depend on frame rate; make the jump simulator match the game (time step, air drag, pop timing) and re-baseline the declared landing ranges; update the in-game "How to ride" speeds to match.
 3. **Trailhead**: see spec. Three start gates; riding through one selects that trail.
 4. **Jolly Green Giant** (green): rollers + pump mechanic.
 5. **Flow Monster** (blue): linked berms + tabletops.
