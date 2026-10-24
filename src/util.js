@@ -21,3 +21,21 @@ export function makeRandom(seed) {
 }
 
 export const pickFrom = (random, list) => list[Math.floor(random() * list.length)];
+
+// Smooth random pattern over the ground: a value from 0 to 1 that changes gently across
+// `cell` metres. The same (x, z) always gives the same value, so separate meshes that
+// meet can be coloured to match exactly.
+export function makeGroundNoise(seed, cell = 4) {
+  const lattice = (i, j) => {
+    let h = Math.imul(i, 374761393) ^ Math.imul(j, 668265263) ^ Math.imul(seed, 2246822519);
+    h = Math.imul(h ^ h >>> 13, 1274126177);
+    return ((h ^ h >>> 16) >>> 0) / 4294967296;
+  };
+  return (x, z) => {
+    const u = x / cell, v = z / cell, i = Math.floor(u), j = Math.floor(v);
+    const fu = smoothstep(u - i), fv = smoothstep(v - j);
+    const top = lattice(i, j) + (lattice(i + 1, j) - lattice(i, j)) * fu;
+    const bottom = lattice(i, j + 1) + (lattice(i + 1, j + 1) - lattice(i, j + 1)) * fu;
+    return top + (bottom - top) * fv;
+  };
+}

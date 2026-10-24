@@ -14,11 +14,18 @@ const FERN_COLOURS = [0x4f7a34, 0x5b8a3b, 0x46702e];
 const BUSH_COLOURS = [0x23391e, 0x2b4424, 0x1f331b, 0x31502a];
 const ROCK_COLOURS = [0x6f736b, 0x7d8178, 0x5f6359];
 
-// Must run straight after the terrain colours, with the same random sequence, to grow
-// the same forest as v1. Returns { chunks: { [chunkIndex]: lists }, treeBuckets }.
+// Plants are placed at a distance s along the trail and an offset square to it. On the inside
+// of a bend a long offset can reach back toward the trail, so every spot is checked against
+// the whole trail. Returns { chunks: { [chunkIndex]: lists }, treeBuckets }.
 export function planForest(trail, random) {
-  const { cx, halfWidth, ground, length } = trail;
+  const { halfWidth, length } = trail;
   const chunks = {}, treeBuckets = {};
+  // World spot for (s, off), or null if it is within `gap` of the trail edge anywhere.
+  const place = (s, off, gap) => {
+    const p = trail.pointAt(s, off), at = trail.locate(p.x, p.z);
+    if (Math.abs(at.off) < halfWidth(at.s) + gap) return null;
+    return { x: p.x, z: p.z, s: at.s, y: trail.groundAt(p.x, p.z) };
+  };
   const chunk = s => {
     const k = Math.floor(s / CHUNK_LENGTH);
     return chunks[k] || (chunks[k] = { trunks: [], canopy: [], fernTrunks: [], fernCrowns: [], bushes: [], rocks: [] });
@@ -28,44 +35,48 @@ export function planForest(trail, random) {
   for (let s = -10; s < length + 70; s += 0.55 + random() * 1.0) {
     for (const side of [-1, 1]) {
       if (random() < 0.22) continue;
-      const off = side * (halfWidth(s) + 1.3 + Math.pow(random(), 1.5) * 58);
-      const x = cx(s) + off, z = -s, y = ground(s, off) - 0.4;
+      const spot = place(s, side * (halfWidth(s) + 1.3 + Math.pow(random(), 1.5) * 58), 1.2);
+      if (!spot) continue;
+      const { x, z } = spot, y = spot.y - 0.4;
       const H = 22 + random() * 18, r = 0.22 + random() * 0.36;
-      const c = chunk(s);
+      const c = chunk(spot.s);
       c.trunks.push({ x, y: y + H / 2, z, sx: r, sy: H, sz: r, ry: random() * 6, c: pickFrom(random, TRUNK_COLOURS) });
       const crowns = 1 + Math.floor(random() * 2);
       for (let n = 0; n < crowns; n++) {
         c.canopy.push({ x: x + (random() - 0.5) * 3, y: y + H * (0.8 + random() * 0.25), z: z + (random() - 0.5) * 3,
           sx: 2.6 + random() * 3.4, sy: 1.2 + random() * 1.3, sz: 2.6 + random() * 3.4, ry: random() * 6, c: pickFrom(random, CANOPY_COLOURS) });
       }
-      const bucket = Math.floor(s / TREE_BUCKET_LENGTH);
+      const bucket = Math.floor(spot.s / TREE_BUCKET_LENGTH);
       (treeBuckets[bucket] || (treeBuckets[bucket] = [])).push({ x, z, r });
     }
   }
   // Tree ferns
   for (let n = 0; n < 2100; n++) {
     const s = -10 + random() * (length + 80), side = random() < 0.5 ? -1 : 1;
-    const off = side * (halfWidth(s) + 0.5 + Math.pow(random(), 1.4) * 30);
-    const x = cx(s) + off, z = -s, y = ground(s, off);
-    const H = 0.8 + random() * 2.4, w = 1.1 + random() * 0.9, c = chunk(s);
+    const spot = place(s, side * (halfWidth(s) + 0.5 + Math.pow(random(), 1.4) * 30), 0.4);
+    if (!spot) continue;
+    const { x, y, z } = spot;
+    const H = 0.8 + random() * 2.4, w = 1.1 + random() * 0.9, c = chunk(spot.s);
     c.fernTrunks.push({ x, y: y + H / 2, z, sx: 1, sy: H, sz: 1, c: 0x4a3424 });
     c.fernCrowns.push({ x, y: y + H + 0.05, z, sx: w, sy: 0.8 + random() * 0.4, sz: w, ry: random() * 6, rx: (random() - 0.5) * 0.2, c: pickFrom(random, FERN_COLOURS) });
   }
   // Undergrowth
   for (let n = 0; n < 1500; n++) {
     const s = -10 + random() * (length + 80), side = random() < 0.5 ? -1 : 1;
-    const off = side * (halfWidth(s) + 3 + Math.pow(random(), 1.1) * 45);
-    const c = chunk(s), w = 0.9 + random() * 1.8;
-    c.bushes.push({ x: cx(s) + off, y: ground(s, off) + 0.1, z: -s, sx: w, sy: 0.45 + random() * 0.7, sz: w * (0.8 + random() * 0.4), ry: random() * 6, c: pickFrom(random, BUSH_COLOURS) });
+    const spot = place(s, side * (halfWidth(s) + 3 + Math.pow(random(), 1.1) * 45), 2.5);
+    if (!spot) continue;
+    const c = chunk(spot.s), w = 0.9 + random() * 1.8;
+    c.bushes.push({ x: spot.x, y: spot.y + 0.1, z: spot.z, sx: w, sy: 0.45 + random() * 0.7, sz: w * (0.8 + random() * 0.4), ry: random() * 6, c: pickFrom(random, BUSH_COLOURS) });
   }
   // Rocks off the trail only, thicker beside the rocky sections
   for (let n = 0; n < 800; n++) {
     const s = -5 + random() * (length + 40);
     const rocky = trail.scenery.rocky.some(r => s > r[0] && s < r[1]);
     if (!rocky && random() < 0.35) continue;
-    const off = (random() < 0.5 ? -1 : 1) * (halfWidth(s) + 0.7 + random() * (rocky ? 5 : 2.5));
+    const spot = place(s, (random() < 0.5 ? -1 : 1) * (halfWidth(s) + 0.7 + random() * (rocky ? 5 : 2.5)), 0.6);
+    if (!spot) continue;
     const size = 0.2 + random() * (rocky ? 0.7 : 0.45);
-    chunk(s).rocks.push({ x: cx(s) + off, y: ground(s, off), z: -s, sx: size * (1 + random() * 0.6), sy: size * 0.6, sz: size,
+    chunk(spot.s).rocks.push({ x: spot.x, y: spot.y, z: spot.z, sx: size * (1 + random() * 0.6), sy: size * 0.6, sz: size,
       rx: random() * 3, ry: random() * 6, c: pickFrom(random, ROCK_COLOURS) });
   }
   return { chunks, treeBuckets };

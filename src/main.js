@@ -84,7 +84,7 @@ function frame(now) {
 
   chaseCamera.update(dt, b, run.state, menuTime, rider.position);
   followWithSun(sun, b.x, b.y, b.z);
-  forest.showNear(-b.z);
+  forest.showNear(b.s);
   hud.update(run.runTime, b);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
