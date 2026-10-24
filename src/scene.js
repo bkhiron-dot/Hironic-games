@@ -1,6 +1,6 @@
 // Renderer, scene, sky, lights and the distant mountains.
 import * as THREE from './three.js';
-import { TRACK_LENGTH } from './trail.js';
+import { TRACK_LENGTH } from './legacy-track.js';
 
 const SKY = 0xc3d3dc;
 

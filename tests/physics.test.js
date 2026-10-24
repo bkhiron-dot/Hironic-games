@@ -5,12 +5,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeRandom } from '../src/util.js';
-import { TRACK_SEED, cx, kickerAt } from '../src/trail.js';
+import { HARDLINE } from '../src/trails/index.js';
 import { terrainData } from '../src/terrain.js';
 import { planForest } from '../src/forest.js';
 import { createBikeState, placeBikeAt, stepRide } from '../src/physics.js';
 
-const random = makeRandom(TRACK_SEED);
+const { cx, kickerAt } = HARDLINE;
+const random = makeRandom(HARDLINE.seed);
 terrainData(random);
 const { treeBuckets } = planForest(random); // tests/forest.test.js shows these match v1's trees
 

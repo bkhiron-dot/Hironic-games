@@ -1,7 +1,7 @@
 // Hardline MTB v2: builds the world, wires the parts together and runs the frame loop.
 import './style.css';
 import { makeRandom } from './util.js';
-import { TRACK_SEED } from './trail.js';
+import { TRACK_SEED } from './legacy-track.js';
 import { createScene, buildMountains, followWithSun } from './scene.js';
 import { buildTerrain } from './terrain.js';
 import { planForest, buildForest } from './forest.js';

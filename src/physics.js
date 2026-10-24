@@ -7,7 +7,7 @@
 //   { type: 'shake', amount }        shake the camera (heavy landing)
 //   { type: 'crash', reason, big }   the rider came off; always the last event
 import { clamp } from './util.js';
-import { cx, cxd, halfWidth, kickerAt, jumpZone } from './trail.js';
+import { cx, cxd, halfWidth, kickerAt, jumpZone } from './legacy-track.js';
 import { ground, groundAt } from './terrain.js';
 import { TREE_BUCKET_LENGTH } from './forest.js';
 

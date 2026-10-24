@@ -2,7 +2,7 @@
 // States: 'menu' (start screen), 'ride', 'crash' (tumbling), 'done' (end screen).
 import * as THREE from './three.js';
 import { clamp } from './util.js';
-import { TRACK_LENGTH, SPLITS, JUMPS } from './trail.js';
+import { TRACK_LENGTH, SPLITS, JUMPS } from './legacy-track.js';
 import { groundAt } from './terrain.js';
 import { G, placeBikeAt, stepRide } from './physics.js';
 import { releaseAll } from './input.js';

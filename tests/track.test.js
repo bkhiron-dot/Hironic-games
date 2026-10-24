@@ -1,12 +1,13 @@
-// Checks that the v2 track (src/trail.js, src/terrain.js) matches v1 exactly.
+// Checks that the Hardline trail (src/trails/hardline.js, built by src/trail.js) matches v1 exactly.
 // The v1 track code is read straight out of public/v1.html and run here, so if
 // anyone changes the v2 track by accident, this fails.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { makeRandom } from '../src/util.js';
-import { cx, cxd, halfWidth, curvature, JUMPS, kickerAt, jumpZone, bermAmount, TRACK_SEED } from '../src/trail.js';
-import { ground } from '../src/terrain.js';
+import { HARDLINE } from '../src/trails/index.js';
+
+const { cx, cxd, halfWidth, curvature, kickerAt, jumpZone, bermAmount, ground, jumps: JUMPS, seed: TRACK_SEED } = HARDLINE;
 
 function loadV1Track() {
   const html = readFileSync(new URL('../public/v1.html', import.meta.url), 'utf8');

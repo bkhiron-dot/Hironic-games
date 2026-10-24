@@ -4,7 +4,7 @@
 // so only the forest near the rider is drawn.
 import * as THREE from './three.js';
 import { pickFrom } from './util.js';
-import { TRACK_LENGTH, ROCKY_SECTIONS, cx, halfWidth } from './trail.js';
+import { TRACK_LENGTH, ROCKY_SECTIONS, cx, halfWidth } from './legacy-track.js';
 import { ground } from './terrain.js';
 
 export const CHUNK_LENGTH = 100;

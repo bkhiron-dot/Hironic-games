@@ -1,7 +1,7 @@
 // Things standing beside the trail: start, split and finish gates, landing flags,
 // and the warning signs before big jumps.
 import * as THREE from './three.js';
-import { SPLITS, JUMPS, cx, cxd, halfWidth } from './trail.js';
+import { SPLITS, JUMPS, cx, cxd, halfWidth } from './legacy-track.js';
 import { ground } from './terrain.js';
 
 const ORANGE = 0xe0672f;

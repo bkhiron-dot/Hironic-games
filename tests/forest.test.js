@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as THREE from '../src/three.js';
 import { makeRandom } from '../src/util.js';
-import { TRACK_SEED } from '../src/trail.js';
+import { HARDLINE } from '../src/trails/index.js';
 import { terrainData } from '../src/terrain.js';
 import { planForest } from '../src/forest.js';
 import { buildMountains } from '../src/scene.js';
@@ -32,7 +32,7 @@ function runV1World() {
 
 test('every crashable gum tree is where it was in v1', () => {
   const v1 = runV1World();
-  const random = makeRandom(TRACK_SEED);
+  const random = makeRandom(HARDLINE.seed);
   terrainData(random);
   const plan = planForest(random);
   assert.deepEqual(plan.treeBuckets, v1.buckets);
@@ -42,7 +42,7 @@ test('every crashable gum tree is where it was in v1', () => {
 
 test('terrain, forest and mountains use the random sequence exactly as v1 did', () => {
   const v1 = runV1World();
-  const random = makeRandom(TRACK_SEED);
+  const random = makeRandom(HARDLINE.seed);
   terrainData(random);
   planForest(random);
   buildMountains({ add() {} }, random);

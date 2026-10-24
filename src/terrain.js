@@ -1,30 +1,11 @@
 // The ground: one height function used by both physics and the terrain mesh,
 // so what you see is always what you ride on.
 import * as THREE from './three.js';
-import { clamp, makeRandom } from './util.js';
-import { TRACK_LENGTH, cx, halfWidth, jumpHeight, bermHeight, bermAmount, curvature, jumpZone, kickerAt } from './trail.js';
+import { makeRandom } from './util.js';
+import { TRACK_LENGTH, cx, halfWidth, bermAmount, curvature, jumpZone, kickerAt, ground, groundAt } from './legacy-track.js';
 
-// Ground height at distance s down the track and sideways offset off.
-export function ground(s, off) {
-  // base grade (-0.2), a slow 7 m undulation, a steeper chute at 500-580 m, and the jumps
-  let h = -0.2 * s - 7 * Math.sin(s / 110) - 0.12 * clamp(s - 500, 0, 80) + jumpHeight(s);
-  const a = Math.abs(off), w = halfWidth(s);
-  h += bermHeight(s, off, w);
-  if (a > w) {
-    // off the trail the hillside rises away, with gentle lumps
-    const e = a - w;
-    h += Math.pow(e, 1.25) * 0.18 + 0.25 * Math.sin(s * 0.31 + off * 0.7) * Math.min(1, e / 2);
-  } else {
-    h -= 0.1 * (1 - (a / w) * (a / w)); // the trail is slightly worn into a shallow dish
-  }
-  return h;
-}
-
-// Same as ground(), from world x and z.
-export const groundAt = (x, z) => {
-  const s = -z;
-  return ground(s, x - cx(s));
-};
+// Ground height: defined by the trail (src/trail.js), so physics and this mesh always agree.
+export { ground, groundAt };
 
 /* ---------- Terrain ribbon mesh ----------
    A strip of triangles following the trail: fine columns across the trail, then
