@@ -33,8 +33,8 @@ function runV1World() {
 test('every crashable gum tree is where it was in v1', () => {
   const v1 = runV1World();
   const random = makeRandom(HARDLINE.seed);
-  terrainData(random);
-  const plan = planForest(random);
+  terrainData(HARDLINE, random);
+  const plan = planForest(HARDLINE, random);
   assert.deepEqual(plan.treeBuckets, v1.buckets);
   const count = Object.values(plan.treeBuckets).reduce((n, list) => n + list.length, 0);
   assert.ok(count > 1500, `only ${count} trees`);
@@ -43,9 +43,9 @@ test('every crashable gum tree is where it was in v1', () => {
 test('terrain, forest and mountains use the random sequence exactly as v1 did', () => {
   const v1 = runV1World();
   const random = makeRandom(HARDLINE.seed);
-  terrainData(random);
-  planForest(random);
-  buildMountains({ add() {} }, random);
+  terrainData(HARDLINE, random);
+  planForest(HARDLINE, random);
+  buildMountains({ add() {} }, HARDLINE, random);
   // If any step drew one random number more or fewer, these would differ.
   for (let i = 0; i < 10; i++) assert.equal(random(), v1.R());
 });

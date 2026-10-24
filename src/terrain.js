@@ -1,15 +1,15 @@
-// The ground: one height function used by both physics and the terrain mesh,
-// so what you see is always what you ride on.
+// The terrain mesh: the trail and the forest floor around it.
 import * as THREE from './three.js';
 import { makeRandom } from './util.js';
-import { TRACK_LENGTH, cx, halfWidth, bermAmount, curvature, jumpZone, kickerAt, ground, groundAt } from './legacy-track.js';
+import { ground, groundAt } from './legacy-track.js';
 
-// Ground height: defined by the trail (src/trail.js), so physics and this mesh always agree.
+// TEMPORARY (step 2a): physics, run and camera still read the ground from here until they are handed a trail.
 export { ground, groundAt };
 
 /* ---------- Terrain ribbon mesh ----------
    A strip of triangles following the trail: fine columns across the trail, then
-   wider and wider columns out into the forest. */
+   wider and wider columns out into the forest. Heights come from trail.ground(), the
+   same function the physics uses, so what you see is always what you ride on. */
 const ACROSS_TRAIL = [-1, -0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1]; // fractions of the half width
 const BEYOND_EDGE = [0.6, 1.4, 2.6, 4.2, 6.5, 10, 15, 22, 32, 46, 66];       // metres past the trail edge
 
@@ -21,8 +21,9 @@ const COLOURS = {
 // Positions, colours, uvs and triangle indices. Uses `random` once per vertex for colour
 // noise, in row order; the forest is grown with the same random sequence afterwards,
 // so this order must not change or every tree moves.
-export function terrainData(random) {
-  const S0 = -20, S1 = TRACK_LENGTH + 80;
+export function terrainData(trail, random) {
+  const { cx, halfWidth, ground, jumpZone, kickerAt, bermAmount, curvature } = trail;
+  const S0 = -20, S1 = trail.length + 80;
   const cols = ACROSS_TRAIL.length + BEYOND_EDGE.length * 2, rows = S1 - S0 + 1;
   const positions = new Float32Array(rows * cols * 3), colours = new Float32Array(rows * cols * 3);
   const uvs = new Float32Array(rows * cols * 2);
@@ -97,8 +98,8 @@ function dirtTexture(renderer) {
   return texture;
 }
 
-export function buildTerrain(scene, renderer, random) {
-  const data = terrainData(random);
+export function buildTerrain(scene, renderer, trail, random) {
+  const data = terrainData(trail, random);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
   geometry.setAttribute('color', new THREE.BufferAttribute(data.colours, 3));

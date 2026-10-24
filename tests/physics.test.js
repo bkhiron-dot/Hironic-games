@@ -12,8 +12,8 @@ import { createBikeState, placeBikeAt, stepRide } from '../src/physics.js';
 
 const { cx, kickerAt } = HARDLINE;
 const random = makeRandom(HARDLINE.seed);
-terrainData(random);
-const { treeBuckets } = planForest(random); // tests/forest.test.js shows these match v1's trees
+terrainData(HARDLINE, random);
+const { treeBuckets } = planForest(HARDLINE, random); // tests/forest.test.js shows these match v1's trees
 
 const section = (html, from, to) => {
   const a = html.indexOf(from), b = html.indexOf(to, a);
