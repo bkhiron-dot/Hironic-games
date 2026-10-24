@@ -1,6 +1,6 @@
 // Everything on screen that isn't 3D: timer, speed and grip, split times, messages,
 // the start and end screens, name entry and the high-score boards.
-import { BOARD_NAMES, TRAIL_ID } from './scores.js';
+import { BOARD_NAMES } from './scores.js';
 import { clamp } from './util.js';
 
 const NAME_KEY = 'hardline-mtb-name'; // last name typed, shared with v1 so it's remembered
@@ -11,7 +11,8 @@ export const formatTime = t => {
 };
 const formatDelta = d => (d < 0 ? '-' : '+') + Math.abs(d).toFixed(2);
 
-export function createHud({ scores, coarse }) {
+export function createHud({ scores, trail, coarse }) {
+  const splitCount = trail.splits.length, finishBoard = splitCount - 1;
   const $ = id => document.getElementById(id);
   const el = {
     time: $('time'), speed: $('speed'), gripFill: $('gripFill'), gripLabel: $('gripLabel'),
@@ -31,16 +32,16 @@ export function createHud({ scores, coarse }) {
   }
 
   function courseRecordLine() {
-    const r = scores.top(TRAIL_ID, 3)[0];
+    const r = scores.top(trail.id, finishBoard)[0];
     el.pbLine.textContent = r ? 'Course record: ' + r.name + '  ' + formatTime(r.time) : 'No finish times yet. Set the first course record.';
   }
 
   // Draws every scoreboard on the page (start and end screens), each on its own tab.
   function renderBoards() {
     document.querySelectorAll('.scoreboard').forEach(board => {
-      const tab = +board.dataset.tab || 0, rows = scores.top(TRAIL_ID, tab);
+      const tab = +board.dataset.tab || 0, rows = scores.top(trail.id, tab);
       let h = '<div class="hs-title">HIGH SCORES</div><div class="hs-tabs" role="tablist">';
-      BOARD_NAMES.forEach((n, i) => { h += `<button class="hs-tab" role="tab" type="button" data-i="${i}" aria-selected="${i === tab}">${i === 3 ? 'FIN' : 'S' + (i + 1)}</button>`; });
+      BOARD_NAMES.forEach((n, i) => { h += `<button class="hs-tab" role="tab" type="button" data-i="${i}" aria-selected="${i === tab}">${i === finishBoard ? 'FIN' : 'S' + (i + 1)}</button>`; });
       h += '</div><div class="hs-table" role="table" aria-label="' + BOARD_NAMES[tab] + ' top 10">';
       for (let k = 0; k < 10; k++) {
         const r = rows[k];
@@ -58,14 +59,14 @@ export function createHud({ scores, coarse }) {
   }
 
   function resetSplit() {
-    el.splitLabel.textContent = 'Split 0 of 4';
+    el.splitLabel.textContent = `Split 0 of ${splitCount}`;
     el.splitDelta.textContent = '--';
     el.splitDelta.className = 'mid';
   }
 
-  // n = split number (4 is the finish); record = the current best for this split, if any.
+  // n = split number (the last is the finish); record = the current best for this split, if any.
   function showSplit(n, time, record) {
-    el.splitLabel.textContent = n === 4 ? 'Finish' : 'Split ' + n + ' of 4';
+    el.splitLabel.textContent = n === splitCount ? 'Finish' : `Split ${n} of ${splitCount}`;
     if (record) {
       const d = time - record.time;
       el.splitDelta.textContent = formatDelta(d) + ' vs record';
@@ -106,13 +107,13 @@ export function createHud({ scores, coarse }) {
     el.nameForm.hidden = !pending.length;
     el.nameErr.hidden = true;
     if (pending.length) {
-      el.hsList.textContent = pending.map(p => BOARD_NAMES[p.board] + ' ' + formatTime(p.time) + ' (#' + scores.rankOf(TRAIL_ID, p.board, p.time) + ')').join('  ·  ');
+      el.hsList.textContent = pending.map(p => BOARD_NAMES[p.board] + ' ' + formatTime(p.time) + ' (#' + scores.rankOf(trail.id, p.board, p.time) + ')').join('  ·  ');
       let last = '';
       try { last = localStorage.getItem(NAME_KEY) || ''; } catch (_) { /* storage blocked */ }
       el.nameInput.value = last;
     }
     // open the board for the furthest split reached
-    el.finishScreen.querySelector('.scoreboard').dataset.tab = reached ? String(reached - 1) : '3';
+    el.finishScreen.querySelector('.scoreboard').dataset.tab = reached ? String(reached - 1) : String(finishBoard);
     renderBoards();
     el.finishScreen.hidden = false;
     if (pending.length && !coarse) setTimeout(() => el.nameInput.focus(), 50); // no keyboard pop-up on phones
@@ -125,7 +126,7 @@ export function createHud({ scores, coarse }) {
     if (!name) { el.nameErr.hidden = false; el.nameInput.focus(); return; }
     try { localStorage.setItem(NAME_KEY, name); } catch (_) { /* storage blocked */ }
     el.nameForm.hidden = true;
-    for (const p of pending) mineIds.add(scores.add(TRAIL_ID, p.board, name, p.time));
+    for (const p of pending) mineIds.add(scores.add(trail.id, p.board, name, p.time));
     pending = [];
     renderBoards();
     el.againBtn.focus();

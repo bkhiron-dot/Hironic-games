@@ -1,10 +1,6 @@
 // The terrain mesh: the trail and the forest floor around it.
 import * as THREE from './three.js';
 import { makeRandom } from './util.js';
-import { ground, groundAt } from './legacy-track.js';
-
-// TEMPORARY (step 2a): physics, run and camera still read the ground from here until they are handed a trail.
-export { ground, groundAt };
 
 /* ---------- Terrain ribbon mesh ----------
    A strip of triangles following the trail: fine columns across the trail, then

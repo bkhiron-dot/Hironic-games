@@ -42,9 +42,9 @@ const { bike, chassis, cranks } = createBike(scene, kit);
 const { rider, upper, legs } = createRider(chassis, kit);
 const dust = createDust(scene);
 const b = createBikeState();
-const chaseCamera = createChaseCamera(camera, reduceMotion);
+const chaseCamera = createChaseCamera(camera, trail, reduceMotion);
 const scores = createScoreStore(SCORES_KEY);
-const hud = createHud({ scores, coarse });
+const hud = createHud({ scores, trail, coarse });
 
 let run = null;
 const keys = createInput({
@@ -52,7 +52,7 @@ const keys = createInput({
   onEndRun: () => run.endRun('restart'),
   onStart: () => run.startRun(),
 });
-run = createRun({ b, keys, scene, chassis, rider, treeBuckets: forestPlan.treeBuckets, hud, scores, chaseCamera });
+run = createRun({ b, keys, trail, scene, chassis, rider, treeBuckets: forestPlan.treeBuckets, hud, scores, chaseCamera });
 document.getElementById('startBtn').addEventListener('click', () => run.startRun());
 document.getElementById('againBtn').addEventListener('click', () => run.startRun());
 

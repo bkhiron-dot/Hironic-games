@@ -1,7 +1,6 @@
-// High scores: top 10 per board (each split and the finish), kept per trail.
+// High scores: top 10 per board (each split and the finish), kept per trail (by trail id).
 // Stored in this browser (localStorage) behind a small interface, so a shared online
 // store can replace it later without changing the rest of the game.
-export const TRAIL_ID = 'hardline'; // v1's track; roadmap step 3 adds more trails
 export const BOARD_NAMES = ['Split 1', 'Split 2', 'Split 3', 'Finish'];
 const TOP = 10;
 
