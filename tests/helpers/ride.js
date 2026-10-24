@@ -6,20 +6,34 @@ import { terrainData } from '../../src/terrain.js';
 import { planForest } from '../../src/forest.js';
 import { createBikeState, placeBikeAt, stepRide } from '../../src/physics.js';
 import { classify } from '../../tools/jump-sim.js';
+import { PHYSICS_STEP } from '../../src/clock.js';
 
 export { T };
 const random = makeRandom(T.seed);
 terrainData(T, random);
 export const { treeBuckets } = planForest(T, random);
-export const DT = 1 / 60;
+export const DT = PHYSICS_STEP; // the game's fixed physics step
 
 // Steer at a point 8 m ahead on the centreline (or `line` metres to its right).
 export function steerAlongTrail(b, keys, line = 0) {
-  const target = T.pointAt(b.s + 8, line);
+  steerAt(b, keys, T.pointAt(b.s + 8, line));
+}
+
+// Steer toward a world point.
+function steerAt(b, keys, target) {
   let err = Math.atan2(target.x - b.x, b.z - target.z) - b.h;
   err = Math.atan2(Math.sin(err), Math.cos(err));
   keys.right = err > 0.03;
   keys.left = err < -0.03;
+}
+
+// What a rider does with the bars: follow the trail; on a kicker, aim at the middle of the
+// landing's sweet spot (the bike can't turn in the air, and the trail may bend under the
+// jump); in the air, hands off.
+function rideLine(b, keys, kicker) {
+  if (b.air) { keys.left = keys.right = false; return; }
+  if (kicker) { const j = kicker.j; steerAt(b, keys, T.pointAt(j.s + (j.sweet0 + j.sweet1) / 2)); return; }
+  steerAlongTrail(b, keys);
 }
 
 // Ride one jump: start before the kicker so the bike reaches the lip at `lipKmh`, no pedalling
@@ -44,10 +58,10 @@ function rideOnce(j, startV, pop) {
   const ahead = T.pointAt(b.s + 0.6);
   b.vy = (T.groundAt(ahead.x, ahead.z) - b.y) / 0.6 * startV;
   let lipKmh = null;
-  for (let step = 0; step < 10 * 60; step++) {
-    // like a rider: steer on the approach, ride the kicker straight, hands off in the air
+  for (let step = 0; step < 10 / DT; step++) {
+    // like a rider: aim the kicker at the landing, hands off in the air
     const k = T.kickerAt(b.s);
-    if (b.air || k) { keys.left = keys.right = false; } else steerAlongTrail(b, keys);
+    rideLine(b, keys, k);
     keys.hop = !!(pop && k && k.u < -b.v * DT); // let go on the step that reaches the lip
     const before = b.s, speed = b.v;
     const events = stepRide(b, keys, T, treeBuckets, true, DT);
@@ -70,7 +84,7 @@ export function rideTrail() {
   placeBikeAt(b, T, T.start.spawn, 0);
   const splitsPassed = [], landings = [];
   let time = 0;
-  for (let step = 0; step < 300 * 60 && b.s < T.length; step++) {
+  for (let step = 0; step < 300 / DT && b.s < T.length; step++) {
     // the next jump within 60 m sets the target speed; otherwise cruise
     const next = T.jumps.find(j => b.s > j.s - j.kick - 60 && b.s < j.s);
     const plan = next && LIP_PLAN[next.kind];
@@ -78,7 +92,7 @@ export function rideTrail() {
     keys.pedal = b.v < target - 0.3;
     keys.brake = b.v > target + 0.3 && !(next && b.s > next.s - next.kick); // no braking on a kicker
     const k = T.kickerAt(b.s);
-    if (b.air || k) { keys.left = keys.right = false; } else steerAlongTrail(b, keys);
+    rideLine(b, keys, k);
     keys.hop = !!(plan && plan.pop && k && k.u < -b.v * DT);
     const before = b.s;
     const events = stepRide(b, keys, T, treeBuckets, true, DT);

@@ -15,6 +15,7 @@ import { createInput } from './input.js';
 import { createScoreStore } from './scores.js';
 import { createHud } from './hud.js';
 import { createRun } from './run.js';
+import { createPhysicsClock, MAX_CATCH_UP } from './clock.js';
 
 const SCORES_KEY = 'hardline-mtb-v2-scores'; // separate from v1's scores on the same site
 
@@ -58,12 +59,17 @@ document.getElementById('againBtn').addEventListener('click', () => run.startRun
 
 /* ---------- Frame loop ---------- */
 let last = performance.now(), menuTime = 0, crankAngle = 0;
+const clock = createPhysicsClock();
 
 function frame(now) {
-  const dt = Math.min(0.033, (now - last) / 1000); // cap the step so a slow frame can't tunnel through things
+  const frameTime = Math.min(MAX_CATCH_UP, (now - last) / 1000);
   last = now;
+  // Physics and timing run in fixed steps, the same on every device (src/clock.js).
+  clock.advance(frameTime, run.step);
+  // Visuals (camera, suspension spring, dust, cranks) move once per frame; capped so a
+  // slow frame can't make the spring jump.
+  const dt = Math.min(0.033, frameTime);
   if (run.state === 'menu') menuTime += dt;
-  run.step(dt);
 
   bike.position.set(b.x, b.y, b.z);
   bike.rotation.set(b.pitch, -(b.h + b.drift), -b.lean);

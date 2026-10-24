@@ -23,6 +23,7 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 - `v2.html` + `src/` - the modular v2 game. `src/main.js` wires it together; each module's header says what it does. `src/trail.js`, `src/jumps.js` and the pure parts of `terrain.js`, `forest.js` and `physics.js` have no DOM, so tests run them in Node.
 - `src/trails/` - one data file per trail (`hardline.js` is the v1 track) and `index.js`, the list of trails. `defineTrail()` in `src/trail.js` checks the data and builds the trail's functions (`ground`, `groundAt`, `pointAt`, `locate`, `halfWidth`, `kickerAt`, ...). Every module is handed the trail it works on; only `main.js` picks one.
 - `src/path.js` - the centreline as a measured path: distance along it, points square to it, and `locate(x, z)` to find any world point on it.
+- `src/clock.js` - fixed-step physics clock (1/240 s steps, at most 0.1 s of catch-up per frame).
 - `src/jumps.js` - jump kinds (shape, landing flags, declared landing ranges). Trails place jumps by kind and may override numbers.
 - `index.html` - home page linking to v1 and v2.
 - `tools/jump-sim.js` - straight-line jump simulator shared by tests and tuning; reads shapes from `src/jumps.js`. `npm run jumps` prints every jump on every trail.
@@ -53,6 +54,7 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 
 | Item | Value | Notes |
 |---|---|---|
+| Physics step | 1/240 s, fixed | Same on every device; visuals still move once per frame |
 | Ground gravity | 9.8 m/s^2 | |
 | Air gravity | 15 m/s^2 | Deliberately 1.5 g for snappier, shorter jumps |
 | Rolling + drag | 0.12 + 0.0045 v^2 | Terminal about 75 km/h on base grade |
@@ -84,15 +86,15 @@ Jump shapes and their declared landing ranges live in `src/jumps.js` and are che
 
 Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diagonal) was ridden 15.5% long and landed smooth at about 53-79 km/h instead of 46-68. With `s` along the path it now lands smooth from 46 km/h in the game.
 
-Game vs simulator, smooth range at the lip (km/h, measured with `tests/helpers/ride.js` at 60 fps):
+Game vs simulator, smooth range at the lip (km/h, measured with `tests/helpers/ride.js`, 1/240 s steps, take-off aimed at the landing):
 
 | Jump | Pop | Game | Simulator |
 |---|---|---|---|
-| 177 m normal | none | 46-74 | 46-68 |
-| 438 m popOptional | none | 54-68 | 52-66 |
-| 438 m popOptional | full | 48-56 | 46-54 |
-| 743 m normal | none | 48-72 | 46-68 |
-| 1037 m bigPop | full | 58-68 | 52-64 |
+| 177 m normal | none | 46-70 | 46-68 |
+| 438 m popOptional | none | 54-66 | 52-66 |
+| 438 m popOptional | full | 48-54 | 46-54 |
+| 743 m normal | none | 46-68 | 46-68 |
+| 1037 m bigPop | full | 56-66 | 52-64 |
 
 ## Known gotchas (learned the hard way)
 
@@ -102,8 +104,9 @@ Game vs simulator, smooth range at the lip (km/h, measured with `tests/helpers/r
 - Light intensities are v1's values x pi. Since r155 Three.js lights scenes pi times dimmer for the same number; for hemisphere and directional lights x pi is exactly r128's look. Don't use the deprecated `useLegacyLights` instead (warns every load, removed in r165).
 - Terrain colour noise, forest and mountains share one seeded random sequence in that order; changing it moves every tree.
 - The forest floor colour is a smooth pattern of world position (`makeGroundNoise`), shared by the detailed strip and the hillside grid so their join doesn't show.
-- **Game physics depends on frame rate.** The physics steps once per frame (dt = frame time, capped at 1/30 s), so jump landings are detected up to a frame late. Measured smooth-range edges move by up to 4 km/h between 120 and 30 fps. Fix in the tuning round: a fixed physics step (e.g. 1/120 s).
-- **The jump simulator differs from the game** in three ways: time step (1/240 s vs the game's frame), no air drag, and pop timing (simulator: exactly at the lip; game: on the kicker just before it). Together these move range edges by up to 6 km/h (table above). `tests/ride.test.js` marks the two biggest gaps as TODO.
+- **Physics runs in fixed 1/240 s steps** (`src/clock.js`, tuning round PR 1). Before that it stepped once per frame and jump ranges moved by up to 6 km/h between 30 and 120 fps. 240/s is settled: 480/s moves one range edge by 2 km/h. A step costs about 11 µs. Below 10 fps the game runs slower than real time (catch-up is capped at 0.1 s per frame).
+- **The jump simulator differs from the game**: no air drag, and pop timing (simulator: exactly at the lip; game: on the kicker just before it). Remaining gaps are up to 4 km/h (table above); `tests/ride.test.js` marks the two biggest as TODO. Tuning round PR 2 makes the simulator use the game's own physics.
+- **The bike can't steer in the air**, so on a jump on a bend it flies straight while the trail curves away. Hardline's last jump (1037 m) is on a 145 m bend on the narrowest part of the trail (half width 2.3 m): ridden straight up the kicker it lands about 1.8 m off-centre. Riders (and `tests/helpers/ride.js`) aim the take-off at the landing.
 - The game must keep working at phone width with touch controls; no `alert`/`prompt`; text input must not trigger game keys.
 - The v1 shared scoreboard used the claude.ai artifact database (`window.claude.use('db')`). That does not exist outside claude.ai. v2 uses localStorage behind a small storage interface so a shared backend can be added later.
 
@@ -113,7 +116,7 @@ Game vs simulator, smooth range at the lip (km/h, measured with `tests/helpers/r
 2. **Trail as data**:
    - **2a** (done): `defineTrail()` + `src/trails/hardline.js`; every module is handed its trail; still matches v1 exactly. Berms are automatic per trail, with `berms.adjust` for a stretch. Jump simulator keeps a constant -0.2 grade (agreed; real profile moves ranges by 1 km/h at most).
    - **2b** (done): `s` follows the winding path. Hardline keeps v1's shape on the hill (1297 m to ride). World-space hill with jump terraces; detailed ground strip plus hillside grid; forest regrown along the path. v1 step-for-step tests retired; replaced by ground tests (v1 riding line away from jumps, no cliffs, no trees on the trail) and game-physics ride tests (every jump, and a full run).
-   - **Tuning round** (next): Ben's playtest notes, plus: fixed physics step so jumps don't depend on frame rate; make the jump simulator match the game (time step, air drag, pop timing) and re-baseline the declared landing ranges; update the in-game "How to ride" speeds to match.
+   - **Tuning round**: PR 1 (done) fixed 1/240 s physics step. PR 2 (next): the simulator uses the game's own physics; re-baseline the declared landing ranges; Ben's reshape of the last jump (longer, higher take-off; lower knuckle). PR 3: Ben's playtest notes; in-game "How to ride" speeds.
 3. **Trailhead**: see spec. Three start gates; riding through one selects that trail.
 4. **Jolly Green Giant** (green): rollers + pump mechanic.
 5. **Flow Monster** (blue): linked berms + tabletops.
