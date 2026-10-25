@@ -47,7 +47,9 @@ export function rideJump(j, lipKmh, pop) {
 // By default it starts at the start gate on Flow Monster; give it a trail with a trailhead
 // (and that trail's trees) to drop in from the clearing instead.
 // Returns { crash, splitsPassed, landings, time (from the start gate), fence (any fence hit) }.
-const LIP_PLAN = { normal: { kmh: 56, pop: 0 }, popOptional: { kmh: 60, pop: 0 }, bigPop: { kmh: 60, pop: 3 } };
+// Speed and pop at each lip, by the jump's distance down the trail (the first and the one before
+// split 3 were stretched for Ben's fast popped run-ins, so they're popped here too).
+const LIP_PLAN = { 177: { kmh: 58, pop: 3 }, 438: { kmh: 60, pop: 0 }, 743: { kmh: 66, pop: 3 }, 1037: { kmh: 60, pop: 3 } };
 export function rideTrail({ trail = T, trees = treeBuckets } = {}) {
   const b = createBikeState(), keys = { left: false, right: false, pedal: false, brake: false, hop: false };
   const th = trail.trailhead;
@@ -58,7 +60,7 @@ export function rideTrail({ trail = T, trees = treeBuckets } = {}) {
   for (let step = 0; step < 300 / DT && b.s < T.length; step++) {
     // the next jump within 60 m sets the target speed; otherwise cruise
     const next = T.jumps.find(j => b.s > j.s - j.kick - 60 && b.s < j.s);
-    const plan = next && LIP_PLAN[next.kind];
+    const plan = next && LIP_PLAN[next.s];
     const target = (plan ? plan.kmh : 58) / 3.6;
     keys.pedal = b.v < target - 0.3;
     keys.brake = b.v > target + 0.3 && !(next && b.s > next.s - next.kick); // no braking on a kicker

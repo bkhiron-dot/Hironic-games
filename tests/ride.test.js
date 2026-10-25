@@ -28,8 +28,9 @@ for (const j of T.jumps) {
   }
 }
 
-test('the first jump now lands smooth at 48 km/h, as designed (in v1 it was ridden 15% long and cased)', () => {
-  assert.equal(rideJump(T.jumps[0], 48, 0).outcome, 'smooth');
+test('the first jump lands smooth at the speed you reach it from a rolling start (about 66 km/h), with or without a pop', () => {
+  assert.equal(rideJump(T.jumps[0], 66, 0).outcome, 'smooth', 'no pop');
+  assert.equal(rideJump(T.jumps[0], 66, 3).outcome, 'smooth', 'full pop');
 });
 
 test('a scripted rider gets from the start to the finish, through every split, without crashing', () => {

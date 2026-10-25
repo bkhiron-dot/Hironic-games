@@ -33,19 +33,27 @@ export default {
   splits: [326, 650, 974, 1297],   // the last one is the finish
 
   features: [
-    { type: 'jump', at: 177, kind: 'normal' },
-    { type: 'jump', at: 438, kind: 'popOptional' },
-    // Ben kept overshooting this one even without a pop. A longer landing alone didn't help (the
-    // landing's slope stays the same), so the kicker is longer and gentler (12 m, was 9; same 1.1 m
-    // lip): you fly flatter and come down in line with the landing. Landing 37 m (was 33, at first 30).
-    // Smooth from 52 to 80 km/h without a pop (was 46-70); you reach this lip at up to about 77.
-    // Flags moved to where the game's landings touch down.
-    { type: 'jump', at: 743, kind: 'normal', kick: 12, land: 37, sweet1: 22, long: 26.5,
+    // Ben pops through the start gate from a rolling start and reaches this lip at about 66-68 km/h;
+    // a pop sent him past the landing. Longer and gentler (kicker 12 m, gap 8.5 m, landing 38 m)
+    // so a full pop at that speed lands smooth (48-68 km/h). Without a pop: smooth 64-88; slower
+    // than 58 without a pop you case it.
+    { type: 'jump', at: 177, kind: 'normal', kick: 12, gap: 8.5, land: 38, short: 7.8, sweet0: 8, sweet1: 25, long: 28,
       landings: [
-        { pop: 0, from: 52, to: 80, outcome: 'smooth' },
-        { pop: 3, from: 36, to: 60, outcome: 'smooth' },
-        { pop: 0, from: 40, to: 44, outcome: 'big crash' },   // far too slow: cased
-        { pop: 0, from: 88, to: 88, outcome: 'small crash' }, // too fast: flat landing
+        { pop: 0, from: 64, to: 88, outcome: 'smooth' },
+        { pop: 3, from: 48, to: 68, outcome: 'smooth' },
+        { pop: 0, from: 40, to: 56, outcome: 'big crash' }, // too slow without a pop: cased
+        { pop: 3, from: 82, to: 90, outcome: 'big crash' }, // popped far too fast: past the landing
+      ] },
+    { type: 'jump', at: 438, kind: 'popOptional' },
+    // Ben kept overshooting this one (reaches the lip at about 72-78 km/h and pops it). Tried a
+    // longer landing (no help: same slope), then a gentler kicker (better without a pop, not with
+    // one). Now longer all round: kicker 14 m, gap 9.5 m, landing 44 m, so a full pop at his speed
+    // lands smooth (54-78 km/h). Without a pop: smooth 74-90, heavy 68-72; slower than 66 you case it.
+    { type: 'jump', at: 743, kind: 'normal', kick: 14, gap: 9.5, land: 44, short: 8.8, sweet0: 9.1, sweet1: 23.5, long: 30,
+      landings: [
+        { pop: 0, from: 74, to: 90, outcome: 'smooth' },
+        { pop: 3, from: 54, to: 78, outcome: 'smooth' },
+        { pop: 0, from: 40, to: 64, outcome: 'big crash' }, // too slow without a pop: cased
       ] },
     { type: 'jump', at: 1037, kind: 'bigPop' },
   ],
