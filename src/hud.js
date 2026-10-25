@@ -12,7 +12,7 @@ export const formatTime = t => {
 const formatDelta = d => (d < 0 ? '-' : '+') + Math.abs(d).toFixed(2);
 
 export function createHud({ scores, trail, coarse }) {
-  const splitCount = trail.splits.length, finishBoard = splitCount - 1;
+  const splitCount = trail.splits.length, finishBoard = splitCount - 1; // the same on every trail
   const $ = id => document.getElementById(id);
   const el = {
     time: $('time'), speed: $('speed'), gripFill: $('gripFill'), gripLabel: $('gripLabel'),
@@ -134,5 +134,12 @@ export function createHud({ scores, trail, coarse }) {
   });
 
   renderBoards();
-  return { toast, resetSplit, showSplit, hideScreens, update, showRunEnd, renderBoards };
+  // Now riding another trail: its name, and its high scores.
+  function setTrail(t) {
+    trail = t;
+    $('trailName').textContent = trail.name;
+    renderBoards();
+  }
+
+  return { toast, resetSplit, showSplit, hideScreens, update, showRunEnd, renderBoards, setTrail };
 }

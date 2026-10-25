@@ -9,7 +9,7 @@
 //   { type: 'bermHit', strength, side } slid into a berm hard (strength 0..1, side +1 = right)
 //   { type: 'crash', reason, big }   the rider came off; always the last event
 import { clamp } from './util.js';
-import { TREE_BUCKET_LENGTH } from './forest.js';
+import { TREE_CELL, treeCell } from './forest.js';
 
 export const G = 9.8;      // gravity on the ground
 export const G_AIR = 15;   // deliberately 1.5 g in the air for snappier, shorter jumps
@@ -340,9 +340,9 @@ function hopAndPop(b, trail, keys, dt, toast) {
 
 // Trees: slower than 2.5 m/s you just stop against it; otherwise a crash, big from 9 m/s (32 km/h).
 function hitTree(b, treeBuckets) {
-  const bucket = Math.floor(b.s / TREE_BUCKET_LENGTH);
-  for (let k = bucket - 1; k <= bucket + 1; k++) {
-    const list = treeBuckets[k];
+  const ci = Math.floor(b.x / TREE_CELL), cj = Math.floor(b.z / TREE_CELL);
+  for (let k = 0; k < 9; k++) {
+    const list = treeBuckets[treeCell(ci + (k % 3) - 1, cj + Math.floor(k / 3) - 1)];
     if (!list) continue;
     for (const t of list) {
       const dx = t.x - b.x, dz = t.z - b.z, r = t.r + 0.38;

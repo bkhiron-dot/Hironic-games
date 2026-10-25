@@ -76,7 +76,8 @@ export function rideTrail({ trail = T, trees = treeBuckets, lipPlan = LIP_PLAN, 
     keys.hop = !!(plan && plan.pop && k && k.u < -b.v * DT) || (pump && !b.air && trail.rollerSlope(b.s) < 0);
     const before = b.s, x0 = b.x, z0 = b.z;
     const events = stepRide(b, keys, trail, trees, timing, DT);
-    if (th && !fence) fence = th.blocked(x0, z0, b.x, b.z);
+    // the fence or a closed gate (riding out through this trail's own gate is the way down)
+    if (th && !fence) { const hit = (trail.world || th).blocked(x0, z0, b.x, b.z); if (hit && !(hit.out && hit.out.difficulty === trail.difficulty)) fence = hit; }
     if (!timing && b.s > trail.start.gate && !th.inClearing(b.x, b.z)) timing = true; // through the gate
     if (timing) time += DT;
     for (const e of events) {

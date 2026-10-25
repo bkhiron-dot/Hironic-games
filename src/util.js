@@ -39,3 +39,30 @@ export function makeGroundNoise(seed, cell = 4) {
     return top + (bottom - top) * fv;
   };
 }
+
+// f averaged over +/-half metres, as a function worked out every metre from `from` to `to` and
+// read back in a straight line between (outside that, f itself).
+export function movingAverage(f, from, to, half) {
+  const n = Math.ceil(to - from) + 1, values = new Float64Array(n + 2 * half), sums = new Float64Array(n + 2 * half + 1);
+  for (let i = 0; i < values.length; i++) values[i] = f(from - half + i);
+  for (let i = 0; i < values.length; i++) sums[i + 1] = sums[i] + values[i];
+  const average = new Float64Array(n);
+  for (let i = 0; i < n; i++) average[i] = (sums[i + 2 * half + 1] - sums[i]) / (2 * half + 1);
+  return d => {
+    const u = d - from, i = Math.floor(u);
+    if (i < 0 || i >= n - 1) return f(d);
+    return average[i] + (average[i + 1] - average[i]) * (u - i);
+  };
+}
+
+// f worked out every `step` metres from `from` to `to`, and read back in a straight line between
+// (outside that, f itself): for smooth things that are slow to work out and asked for often.
+export function tableOf(f, from, to, step) {
+  const n = Math.ceil((to - from) / step) + 1, values = new Float64Array(n);
+  for (let i = 0; i < n; i++) values[i] = f(from + i * step);
+  return v => {
+    const u = (v - from) / step, i = Math.floor(u);
+    if (i < 0 || i >= n - 1) return f(v);
+    return values[i] + (values[i + 1] - values[i]) * (u - i);
+  };
+}

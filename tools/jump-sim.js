@@ -6,6 +6,8 @@
 // grade (Flow Monster's -0.2 by default) and rides it so the bike reaches the lip at `kmh`. No pedalling, braking or
 // steering; with a pop, the rider crouches up the kicker and lets go on the last step
 // before the lip (the best pop a rider can do). rideJump() does the same on a real trail.
+// A trail on the shared mountain (src/world.js) has no single grade, so its jumps are ridden
+// where they are, on the trail itself (simulateOn), steering along it like a rider.
 import { defineTrail } from '../src/trail.js';
 import { SHAPE_KEYS, resolveJump } from '../src/jumps.js';
 import { createBikeState, placeBikeAt, stepRide } from '../src/physics.js';
@@ -94,6 +96,28 @@ export function simulate(j, kmh, pop = 0, grade = BASE_GRADE) {
   return rideJump(trail, trail.jumps[0], kmh, pop);
 }
 
+// A rider's steering on a real trail: follow the trail (aiming 8 m ahead, leaning just enough
+// for the arc there); on a kicker aim at the middle of the landing's sweet spot (the bike can't
+// turn in the air, and the trail may bend under the jump); in the air, hands off.
+export function followTrail(trail) {
+  return (keys, b, kicker) => {
+    if (b.air) { keys.left = keys.right = false; return; }
+    const j = kicker && kicker.j, target = j ? trail.pointAt(j.s + (j.sweet0 + j.sweet1) / 2) : trail.pointAt(b.s + 8);
+    const dx = target.x - b.x, dz = b.z - target.z, dist = Math.max(4, Math.hypot(dx, dz));
+    let err = Math.atan2(dx, dz) - b.h;
+    err = Math.atan2(Math.sin(err), Math.cos(err));
+    const want = Math.atan(2 * b.v * b.v * Math.sin(err) / dist / 9.8);
+    keys.right = b.lean < want - 0.03;
+    keys.left = b.lean > want + 0.03;
+  };
+}
+
+// Jump j of `trail` at `kmh` with `pop`: on the trail itself if it's on the mountain, otherwise
+// alone on a straight test trail at the trail's grade.
+export function simulateOn(trail, j, kmh, pop = 0) {
+  return trail.onMountain ? rideJump(trail, j, kmh, pop, followTrail(trail)) : simulate(j, kmh, pop, trail.grade);
+}
+
 // Table of outcomes across a speed range, for reports.
 export function sweep(j, pop = 0, from = 30, to = 76, step = 2, grade = BASE_GRADE) {
   const rows = [];
@@ -108,7 +132,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     for (const j of trail.jumps) {
       for (const pop of [0, 3]) {
         console.log(`\n${trail.name}, jump at ${j.s} m (${j.kind})${pop ? ', full pop' : ', no pop'}`);
-        for (const r of sweep(j, pop, 20, 76, 2, trail.grade)) console.log(`  ${String(r.kmh).padStart(3)} km/h  lands ${r.landAt?.toFixed(1).padStart(5)} m  ${r.outcome}`);
+        for (let kmh = 20; kmh <= 90; kmh += 2) { const r = simulateOn(trail, j, kmh, pop); console.log(`  ${String(kmh).padStart(3)} km/h  lands ${r.landAt?.toFixed(1).padStart(5)} m  ${r.outcome}`); }
       }
     }
     for (const r of trail.rollers) {
