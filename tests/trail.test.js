@@ -147,11 +147,11 @@ test('the physics rides a second trail: follows its line, clears its jump, reach
   assert.ok(seen.includes('Sweet landing') || seen.includes('Clean landing'), `landed the jump: ${seen.join(' | ')}`);
 });
 
-test('no game module reads a particular trail: only the trail list and main.js do', () => {
+test('no game module reads a particular trail: only the trail and park lists and main.js do', () => {
   const dir = new URL('../src/', import.meta.url);
   for (const file of readdirSync(dir).filter(f => f.endsWith('.js'))) {
     const code = readFileSync(new URL(file, dir), 'utf8');
-    if (file === 'main.js') continue;
+    if (file === 'main.js' || file === 'parks.js') continue; // parks.js lists each park's trails
     assert.ok(!/from\s+['"][^'"]*trails\//.test(code), `${file} imports a trail directly`);
   }
 });

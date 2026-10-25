@@ -11,6 +11,7 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 - Prefer small, reviewable commits. Run `npm test` before every commit.
 - When changing physics or a jump, re-run the jump simulator and report the new landing ranges as a table (speed at lip -> smooth / heavy / small crash / big crash).
 - **Branches** (Ben, 25 Oct): `main` is the live game the boys play; don't change it without Ben saying so. Work PRs target **`next`**. When there's something to play-test, open a release PR `next` -> `main` with the `preview` label, so Ben can try it at `preview/pr-<number>/`. Merging that release PR is Ben's call; it publishes to the live game.
+- **Versions** (Ben, 25 Oct): main and next have separate numbers (`src/version.js`, history in `CHANGELOG.md`). Every PR merged into next bumps next: minor (1.1 -> 1.2) for a refinement (a trail line, a jump, physics), major (2.0) for a new trail or major feature. A release PR bumps main the same way, by what the release brings. The start screen shows the number: "v1.1 main" on the live game, "v1.2 next (live game v1.1)" on a preview.
 - **Previews** (Ben, 24 Oct): not on every PR. Add the `preview` label only when Ben asks, and suggest it when a change is significant or risky (physics or jump changes, new trails or features, big visual changes, anything that could hurt phone frame rate).
 
 ## Commands
@@ -24,6 +25,9 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 - `public/v1.html` - **reference build**: the complete v1 game in one file, exactly as it was when ported from claude.ai. Treat it as the behavioural spec. Do not edit it; copy logic out of it into `src/`.
 - `index.html` + `src/` - the game (v2, modular). `src/main.js` wires it together; each module's header says what it does. `src/trail.js`, `src/jumps.js` and the pure parts of `terrain.js`, `forest.js` and `physics.js` have no DOM, so tests run them in Node.
 - `src/trails/` - one data file per trail (`flow-monster.js` is the v1 track; Hardline is the name of the game, not a trail) and `index.js`, the list of trails. `defineTrail()` in `src/trail.js` checks the data and builds the trail's functions (`ground`, `groundAt`, `pointAt`, `locate`, `halfWidth`, `kickerAt`, ...). Every module is handed the trail it works on; only `main.js` picks one.
+- `src/parks.js` - the bike parks and their trails. One so far: Maydena Bike Park, Tasmania (the current trails are its mid-mountain stage). The game can grow to more parks.
+- `src/version.js` + `CHANGELOG.md` - version numbers (see Working with Ben) and what each changed.
+- `src/texture.js` - `paintedTexture(canvas)`: every texture painted on a canvas goes through it (see gotchas).
 - `src/path.js` - the centreline as a measured path: distance along it, points square to it, and `locate(x, z)` to find any world point on it.
 - `src/clock.js` - fixed-step physics clock (1/240 s steps, at most 0.1 s of catch-up per frame).
 - `src/jumps.js` - jump kinds (shape, landing flags, declared landing ranges). Trails place jumps by kind and may override numbers.
@@ -114,6 +118,7 @@ Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diago
 - **The bike can't steer in the air**, so on a jump on a bend it flies straight while the trail curves away. Flow Monster's last jump (1037 m) is on a 145 m bend on the narrowest part of the trail (half width 2.3 m): ridden straight up the kicker it lands about 1.8 m off-centre. Riders (and `tests/helpers/ride.js`) aim the take-off at the landing.
 - **The trailhead clearing is cut into a valley**: the trail runs between banks that rise up to 20 m within 25 m of it, so a level 50 x 36 m pad with a smooth blend made cliffs (1.5 m per 0.5 m). The ground round it is graded instead: it may rise above or fall below the pad no faster than 0.7 (35 degrees, easing in over 6 m), and is the plain hill wherever that's gentler. Steepest step round it: 0.35 m per 0.5 m (limit 0.5). Past the gate the trail itself is untouched from 2 m on.
 - **Deploy concurrency is per job, not per workflow.** With one workflow-level group, the "pull request closed" run (skipped, no preview label) cancelled the publish of PR #11's merge, so main didn't go live. A skipped job never joins a job-level group.
+- **Painted textures must not be `THREE.CanvasTexture`** (25 Oct): on Ben's phone the live game drew the dirt, trunks and fence tape black. A phone drops the WebGL context on a tab or app switch and can wipe hidden canvases; on restore Three.js re-uploads from the canvas, so a wiped one is black. `paintedTexture()` keeps a copy of the pixels.
 - Anything drawn on the ground (tyre tracks) must also wind its triangles to face up, or it is culled and invisible.
 - **Start a test bike already following the slope.** `placeBikeAt` sets no vertical speed; dropped in at speed on a -0.28 slope it flies about 12 m and bottoms out. Set `b.vy` from the slope ahead, as `tools/jump-sim.js` does. (Early berm-hit numbers in PR #10 were measured without this; re-measured in 3b.)
 - Every plant kind added to the forest must be listed in the ground test's "nothing grows on the trail" check, with its gap.
@@ -140,5 +145,6 @@ Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diago
    - one stage loaded at a time;
    - rolling starts: each stage's start brings speed into a known band, tested for every incoming x outgoing line;
    - freeride (untimed, any line) and race mode (timed, one colour top to bottom, barricaded course through trailheads).
+9. **More bike parks** (Ben, 25 Oct; later): the game can grow to other parks over time. Maydena, Tasmania is the first. Parks are data (`src/parks.js`), each with its trails (later its stages and trailheads); scores will need to be kept per park.
 
 Every new jump or roller feature must declare its expected landing ranges (`landings` in `src/jumps.js`, or on the trail feature if it changes the shape); `tests/jumps.test.js` checks them all.
