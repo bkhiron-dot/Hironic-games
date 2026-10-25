@@ -77,6 +77,8 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 | Drift | sideways slip += excess x 0.55 dt, scrub excess x 0.22 dt | |
 | Berm catch | on berm (tan b > 0.25) after a slide: slip decays x exp(-9 dt), extra g x min(0.6, 0.8 tan b) turning, speed refund |
 | Berm hit | first contact with a berm after a slide harder than 0.3 (slide peak x fading memory, or slip / 1.5 m/s): bike swings 60% of the way to the trail's heading (only round the corner), sideways speed added to forward speed (v = sqrt(v^2 + slip^2)), slip x 0.2 | step 3, Ben's request. Speed kept (-0.03 to +0.27 km/h at the hit); drifting wide into berms ran off the trail in 2 of 48 test runs, was 9 | |
+| Berm hold | on a berm (tan b > 0.25, berm over 0.3 m), steering at least 30% into the corner: slide stops (slip x exp(-12 dt)), and if the bike points out of the berm's line it turns toward it at 4/s (63% in 0.25 s). No hold when not steering or steering the wrong way: you can drift out over the top | Ben's 3b playtest (understeer on berms). Sliding wide onto a berm steering in: over the top 0 of 156 runs (was 8). Not steering / wrong way: 97% / 100% over (unchanged) |
+| Take-off | only where the ground drops more than 5 mm below where gravity alone would carry the bike in one step | was 0 mm: turning down a berm's banked face made the bike chatter air/ground (56% airborne into one corner) so it couldn't steer. Jump ranges unchanged |
 | Suspension travel | 0.55 m (0.40 m if crouched) | |
 | Landing decel | 38 m/s^2 | travel used = vi^2 / (2 x 38) / travel |
 | Landing outcome | < 0.55 smooth, < 1.0 heavy, < 1.35 small crash, else big crash | lean over 0.4 rad adds penalty |
