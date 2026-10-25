@@ -91,7 +91,7 @@ Jump shapes and their declared landing ranges live in `src/jumps.js` and are che
 | Jump | Smooth | Notes |
 |---|---|---|
 | Normal (177 m) | 46-68 no pop, 34-52 pop | lip 1.1 m, gap 6 m, landing 30 m. Too fast: small crash at 76, big crash from 78 km/h |
-| Normal, longer landing (743 m) | 46-70 no pop, 34-52 pop | Landing 33 m (+10%, Ben overshot it twice): heavy 72-76, small crash 78, big crash from 80 km/h; with a pop heavy 54-60, small crash 62-64, big crash from 66. Trail below sits 0.58 m lower |
+| Normal, reshaped (743 m) | 52-80 no pop, 36-60 pop | Ben overshot it with no pop (twice at 30 m, again at 33 m). A longer landing alone didn't help (its slope stays the same), so: kicker 12 m (was 9, same 1.1 m lip: flatter flight), landing 37 m. No pop: heavy 48-50 and 82-86, small crash 46 and 88, big crash below 46. Pop: heavy 34 and 62-68, small crash 70-72, big crash from 74. Trail below sits 1.36 m lower than v1 |
 | Big, pop optional (438 m) | 52-66 no pop, 46-54 pop | lip 1.5 m, gap 8.5 m (was 9; tuning round 2), 42 m landing |
 | Big, needs pop, kind `bigPop` (1037 m) | 54-66 pop; no pop cases | Shaped with Ben (tuning rounds 2-4): kicker 12 m, lip 1.8 m, gap 12 m, knuckle 2.4 m, landing 48 m at pitch 0.7. Sweet spot 12.3-30.1 m past the lip. Round 3's 2.2 m lip overshot with a pop at speed; this one is built for a fast pop (lip reachable at about 62 on Flow Monster) |
 
