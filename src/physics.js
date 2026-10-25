@@ -19,6 +19,7 @@ export const G_AIR = 15;   // deliberately 1.5 g in the air for snappier, shorte
 // bank really holds it down: it chattered air/ground and couldn't steer (Ben, step 3b playtest).
 // Real lips drop away far faster, so no jump range moved.
 const TAKEOFF_MARGIN = 0.005;
+const BERM_CATCH_LEVEL = 0.6;     // a slide is caught 60% of the way up the berm's height
 const BERM_HOLD_STEER = 0.3;      // berm hold: steering at least 30% into the corner...
 const BERM_HOLD_MIN = 0.3;        // ...on a berm at least 0.3 m high...
 const BERM_HOLD_RATE = 4;         // ...turns the bike toward the berm's line at 4 per second (63% in 0.25 s)...
@@ -39,6 +40,7 @@ export function createBikeState() {
     drift: 0, slipV: 0,              // visual drift angle, sideways slip speed (m/s)
     slideMem: 0, caught: false,      // fades after a slide; a berm can catch you while it lasts
     slidePeak: 0,                    // hardest slide (0..1) since the last time you had grip
+    pressed: false,                  // a berm is holding the bike this step (it can't take off)
     fromLip: false, popped: false,   // left the ground off a kicker; already popped this jump
     stuckT: 0, slideToastT: 0,       // timers: stuck in a hole, and gap between drift messages
   };
@@ -130,7 +132,7 @@ function steer(b, keys, dt) {
 // Cornering: lean asks for sideways grip; tyres and berms decide how much you get.
 function corner(b, trail, s, off, dt, toast, events) {
   const { groundAt } = trail;
-  b.slide = 0; b.grip = 0;
+  b.slide = 0; b.grip = 0; b.pressed = false;
   const rx = Math.cos(b.h), rz = Math.sin(b.h); // rider's right, flat
   if (b.air) {
     b.drift *= Math.exp(-dt * 3);
@@ -141,7 +143,17 @@ function corner(b, trail, s, off, dt, toast, events) {
     const gRight = groundAt(b.x + rx * 0.5, b.z + rz * 0.5), gLeft = groundAt(b.x - rx * 0.5, b.z - rz * 0.5);
     const mu = trail.onTrail(s, off, b.x, b.z) ? 0.75 : 0.5;
     const tanBank = clamp(turn * (gLeft - gRight), -0.6, 1 / mu - 0.15);
-    const aMax = G * (mu + tanBank) / (1 - mu * tanBank);
+    // How far up this corner's berm the bike is, as a share of the berm's height (0 at the trail's
+    // middle, 1 at the top edge; the wall curves up as (distance out / half width)^2).
+    const corner = Math.sign(trail.curvature(s));
+    const out = corner === 0 ? 0 : off * -corner / trail.halfWidth(s);
+    const bermLevel = trail.bermAmount(s) > BERM_HOLD_MIN ? (out <= 0 ? 0 : out >= 1 ? 1 : out * out) : 0;
+    const aboveCatch = bermLevel >= BERM_CATCH_LEVEL;
+    // Still sliding below the catch line, the lower berm doesn't stop you: you keep understeering
+    // and drifting wide up it, gripping like flat dirt, until the berm catches you higher up.
+    const climbing = b.slideMem > 0 && bermLevel > 0 && !aboveCatch;
+    const grip = climbing ? Math.min(tanBank, 0) : tanBank;
+    const aMax = G * (mu + grip) / (1 - mu * grip);
     b.grip = Math.abs(aDemand) / aMax;
     let aUse = aDemand;
     if (Math.abs(aDemand) > aMax) {
@@ -156,12 +168,12 @@ function corner(b, trail, s, off, dt, toast, events) {
       b.slidePeak = Math.max(b.slidePeak, b.slide);
     }
     const onBerm = tanBank > 0.25;
-    // Berm hold: on a berm, steering into the corner, the berm stops the slide and brings the
-    // bike round to run along it (it can't understeer off the top). Not steering, or steering
-    // the wrong way, there's no hold: you can still drift out over the top.
-    const corner = Math.sign(trail.curvature(s));
+    // Berm hold: at or above the catch line, steering into the corner, the berm stops the slide
+    // and brings the bike round to run along it (it can't understeer off the top). Not steering,
+    // or steering the wrong way, there's no hold: you can still drift out over the top.
     const intoCorner = corner !== 0 && Math.sign(b.steerIn) === corner && Math.abs(b.steerIn) >= BERM_HOLD_STEER;
-    const holding = onBerm && intoCorner && trail.bermAmount(s) > BERM_HOLD_MIN && trail.onTrail(s, off, b.x, b.z);
+    const holding = onBerm && aboveCatch && intoCorner && trail.onTrail(s, off, b.x, b.z);
+    b.pressed = holding; // the berm presses the bike into it (see flyOrFollowGround)
     if (holding) {
       b.slide = 0; aUse = aDemand;
       b.slipV *= Math.exp(-BERM_HOLD_SLIP_DECAY * dt);
@@ -169,7 +181,7 @@ function corner(b, trail, s, off, dt, toast, events) {
       along = Math.atan2(Math.sin(along), Math.cos(along));
       if (Math.sign(along) === corner) b.h += along * Math.min(1, BERM_HOLD_RATE * dt); // pointing out: bring it round
     }
-    if (onBerm && b.slideMem > 0) {
+    if (onBerm && aboveCatch && b.slideMem > 0) {
       // Berm hit: sliding into the wall, the tyres dig in and the berm turns you: the bike
       // swings round to run along the berm (the trail's direction here) and the sideways
       // speed is added to the forward speed, so no speed is lost. A burst of dirt shows it.
@@ -210,7 +222,9 @@ function corner(b, trail, s, off, dt, toast, events) {
 function flyOrFollowGround(b, trail, gNew, slopeNew, dt, events) {
   if (!b.air) {
     const followVy = (gNew - b.y) / dt;
-    if (followVy < b.vy - G * dt - TAKEOFF_MARGIN / dt && followVy < -1.5) {
+    // A berm holding the bike presses it into the wall: swinging round to run along the berm
+    // (the ground stops rising under it) mustn't throw it into the air.
+    if (!b.pressed && followVy < b.vy - G * dt - TAKEOFF_MARGIN / dt && followVy < -1.5) {
       b.fromLip = !!trail.kickerAt(b.s - 1.5); b.popped = false;
       b.air = true; b.airT = 0; b.vy -= G_AIR * dt; b.y += b.vy * dt;
     } else { b.vy = followVy; b.y = gNew; }

@@ -37,7 +37,7 @@ test('drifting wide into a berm is a berm hit: the bike swings round the corner 
   let hits = 0;
   for (const at of [338, 534, 646, 845, 955, 1157]) {
     for (const kmh of [45, 55]) {
-      const r = rideIntoBerm(at, kmh, 0.6, 8);
+      const r = rideIntoBerm(at, kmh, 0.9, 8); // drifting high: past the catch line (60% of the berm's height)
       if (!r.hit) continue;
       hits++;
       // no speed lost to the hit (the same step also has slope and drag: under 0.02 m/s)
@@ -57,16 +57,17 @@ test('riding a berm without drifting is not a hit', () => {
   for (const at of [338, 534, 646, 845]) assert.equal(rideIntoBerm(at, 35, 0.3, 8).hit, null, `berm at ${at}`);
 });
 
-/* ---------- Berm hold (Ben, 3b playtest) ----------
-   Slide wide from the inside half of the trail onto a berm. Steering into the corner, the berm
-   holds you: the slide stops and the bike comes round to run along it. Not steering, or
-   steering the wrong way, you drift out over the top. */
+/* ---------- Berm catch line and hold (Ben, 3b playtests) ----------
+   Slide wide from the inside half of the trail onto a berm. Steering into the corner, you keep
+   understeering and drifting up the berm until about 60% of its height, where it catches you
+   (a berm hit) and holds you: the bike comes round to run along it. Not steering, or steering
+   the wrong way, you drift out over the top. */
 const corners = [];
 for (let s = 150; s < 1280; s++) if (T.bermAmount(s) > 1.5 && !(corners.length && s - corners.at(-1) < 40)) corners.push(s);
 
 // Start where the berm is 1 m high, on the inside half, pointing `outDeg` out of the corner and
-// already sliding wide at `slip` m/s. Returns the highest point reached up the berm, as a share
-// of the half width (1 = the top edge), and whether it crashed.
+// already sliding wide at `slip` m/s. Returns the highest point reached up the berm and where the
+// berm hit happened, both as a share of the berm's height (1 = the top edge), and any crash.
 function slideOntoBerm(at, kmh, outDeg, slip, steering) {
   const corner = Math.sign(T.curvature(at));
   let s0 = at;
@@ -79,29 +80,38 @@ function slideOntoBerm(at, kmh, outDeg, slip, steering) {
   const dir = { into: corner, none: 0, wrong: -corner }[steering];
   Object.assign(b, { slipV: -corner * slip, slideMem: 1, slidePeak: 0.6, steerIn: dir, lean: dir * 0.8 });
   keys.right = dir > 0; keys.left = dir < 0;
-  let highest = -9, crash = null;
+  let highest = 0, hitAt = null, crash = null;
   for (let step = 0; step < 3 / DT && b.s < s0 + 40; step++) {
     const events = stepRide(b, keys, T, {}, true, DT);
     crash = events.find(e => e.type === 'crash') || crash;
     if (crash) break;
-    const L = T.locate(b.x, b.z);
-    highest = Math.max(highest, L.off * -Math.sign(T.curvature(L.s)) / T.halfWidth(L.s));
+    const L = T.locate(b.x, b.z), out = Math.max(0, L.off * -Math.sign(T.curvature(L.s)) / T.halfWidth(L.s));
+    const level = out * out; // the berm wall rises as (distance out / half width)^2
+    highest = Math.max(highest, level);
+    if (hitAt === null && events.some(e => e.type === 'bermHit')) hitAt = level;
   }
-  return { highest, crash };
+  return { highest, hitAt, crash };
 }
 
-test('sliding wide onto a berm while steering into the corner: the berm holds you (never over the top)', () => {
-  for (const at of corners) for (const kmh of [40, 55, 70]) for (const outDeg of [10, 25]) {
+test('sliding wide onto a berm while steering into the corner: drift up to 60% of its height, hit, held below the top', () => {
+  let runs = 0, hits = 0;
+  for (const at of corners) for (const kmh of [50, 60, 70]) for (const outDeg of [10, 25]) {
+    const where = `berm at ${at}, ${kmh} km/h, ${outDeg} deg out`;
     const r = slideOntoBerm(at, kmh, outDeg, 2, 'into');
-    assert.equal(r.crash, null, `berm at ${at}, ${kmh} km/h, ${outDeg} deg out: no crash`);
-    assert.ok(r.highest < 0.8, `berm at ${at}, ${kmh} km/h, ${outDeg} deg out: held below the top (got to ${r.highest.toFixed(2)})`);
+    runs++;
+    assert.equal(r.crash, null, `${where}: no crash`);
+    assert.ok(r.highest < 1, `${where}: held below the top (got to ${r.highest.toFixed(2)} of the height)`);
+    if (r.hitAt === null) continue; // a gentle slide can fade out before the catch line: no hit
+    hits++;
+    assert.ok(r.hitAt >= 0.55 && r.hitAt < 0.7, `${where}: berm hit at the catch line (got ${r.hitAt.toFixed(2)})`);
   }
+  assert.ok(hits >= 0.8 * runs, `berm hits in ${hits} of ${runs}`);
 });
 
 test('not steering, or steering the wrong way, you can still drift out over the berm', () => {
   for (const steering of ['none', 'wrong']) {
     let over = 0, runs = 0;
-    for (const at of corners) for (const kmh of [55, 70]) { runs++; if (slideOntoBerm(at, kmh, 25, 2, steering).highest > 1.2) over++; }
+    for (const at of corners) for (const kmh of [55, 70]) { runs++; if (slideOntoBerm(at, kmh, 25, 2, steering).highest > 1.5) over++; }
     assert.ok(over >= 0.8 * runs, `${steering}: out over the top in ${over} of ${runs}`);
   }
 });
