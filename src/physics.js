@@ -19,6 +19,9 @@ export const G_AIR = 15;   // deliberately 1.5 g in the air for snappier, shorte
 // bank really holds it down: it chattered air/ground and couldn't steer (Ben, step 3b playtest).
 // Real lips drop away far faster, so no jump range moved.
 const TAKEOFF_MARGIN = 0.005;
+const SLIDE_GRIP = 0.9;  // sliding tyres grip 90% as well as rolling ones (Ben: drift wide more)...
+const SLIP_GAIN = 2.0;   // ...and the slide builds sideways speed this fast (was 0.55)...
+const SLIP_MAX = 5;      // ...up to 5 m/s (was 4)
 const BERM_CATCH_LEVEL = 0.6;     // a slide is caught 60% of the way up the berm's height
 const BERM_HOLD_STEER = 0.3;      // berm hold: steering at least 30% into the corner...
 const BERM_HOLD_MIN = 0.3;        // ...on a berm at least 0.3 m high...
@@ -40,6 +43,7 @@ export function createBikeState() {
     drift: 0, slipV: 0,              // visual drift angle, sideways slip speed (m/s)
     slideMem: 0, caught: false,      // fades after a slide; a berm can catch you while it lasts
     slidePeak: 0,                    // hardest slide (0..1) since the last time you had grip
+    sliding: false,                  // the tyres are sliding (they grip less until they hook up again)
     pressed: false,                  // a berm is holding the bike this step (it can't take off)
     fromLip: false, popped: false,   // left the ground off a kicker; already popped this jump
     stuckT: 0, slideToastT: 0,       // timers: stuck in a hole, and gap between drift messages
@@ -141,7 +145,10 @@ function corner(b, trail, s, off, dt, toast, events) {
     // toward the outside of the turn adds support: aMax = g(mu + tan b)/(1 - mu tan b).
     const aDemand = G * Math.tan(b.lean), turn = Math.sign(aDemand) || 1;
     const gRight = groundAt(b.x + rx * 0.5, b.z + rz * 0.5), gLeft = groundAt(b.x - rx * 0.5, b.z - rz * 0.5);
-    const mu = trail.onTrail(s, off, b.x, b.z) ? 0.75 : 0.5;
+    // Once the tyres are sliding they grip less than when rolling (sliding friction is lower), so a
+    // slide carries on until you ease off: you drift wide. They hook up again below that grip.
+    const muRoll = trail.onTrail(s, off, b.x, b.z) ? 0.75 : 0.5;
+    const mu = b.sliding ? muRoll * SLIDE_GRIP : muRoll;
     const tanBank = clamp(turn * (gLeft - gRight), -0.6, 1 / mu - 0.15);
     // How far up this corner's berm the bike is, as a share of the berm's height (0 at the trail's
     // middle, 1 at the top edge; the wall curves up as (distance out / half width)^2).
@@ -156,14 +163,16 @@ function corner(b, trail, s, off, dt, toast, events) {
     const aMax = G * (mu + grip) / (1 - mu * grip);
     b.grip = Math.abs(aDemand) / aMax;
     let aUse = aDemand;
-    if (Math.abs(aDemand) > aMax) {
+    if (Math.abs(aDemand) <= aMax) b.sliding = false; // within grip: the tyres hook up again
+    else {
       // Drift: the tyres let go, the rear steps out and you slide sideways toward the
       // outside of the corner, scrubbing a little speed.
       const excess = Math.abs(aDemand) - aMax;
       aUse = turn * aMax;
       b.slide = Math.min(1, excess / aMax * 1.5);
       b.v = Math.max(0, b.v - excess * 0.22 * dt);
-      b.slipV = clamp(b.slipV - turn * excess * 0.55 * dt, -4, 4);
+      b.slipV = clamp(b.slipV - turn * excess * SLIP_GAIN * dt, -SLIP_MAX, SLIP_MAX);
+      b.sliding = true;
       b.slideMem = 1;
       b.slidePeak = Math.max(b.slidePeak, b.slide);
     }
@@ -175,7 +184,7 @@ function corner(b, trail, s, off, dt, toast, events) {
     const holding = onBerm && aboveCatch && intoCorner && trail.onTrail(s, off, b.x, b.z);
     b.pressed = holding; // the berm presses the bike into it (see flyOrFollowGround)
     if (holding) {
-      b.slide = 0; aUse = aDemand;
+      b.slide = 0; b.sliding = false; aUse = aDemand;
       b.slipV *= Math.exp(-BERM_HOLD_SLIP_DECAY * dt);
       let along = trail.headingAt(s) - b.h; // how far the bike points away from the berm's line
       along = Math.atan2(Math.sin(along), Math.cos(along));
