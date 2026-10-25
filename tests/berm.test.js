@@ -80,7 +80,7 @@ function slideOntoBerm(at, kmh, outDeg, slip, steering) {
   const dir = { into: corner, none: 0, wrong: -corner }[steering];
   Object.assign(b, { slipV: -corner * slip, slideMem: 1, slidePeak: 0.6, steerIn: dir, lean: dir * 0.8 });
   keys.right = dir > 0; keys.left = dir < 0;
-  let highest = 0, hitAt = null, crash = null;
+  let highest = 0, hitAt = null, crash = null, slideAfterHit = 0;
   for (let step = 0; step < 3 / DT && b.s < s0 + 40; step++) {
     const events = stepRide(b, keys, T, {}, true, DT);
     crash = events.find(e => e.type === 'crash') || crash;
@@ -89,8 +89,9 @@ function slideOntoBerm(at, kmh, outDeg, slip, steering) {
     const level = out * out; // the berm wall rises as (distance out / half width)^2
     highest = Math.max(highest, level);
     if (hitAt === null && events.some(e => e.type === 'bermHit')) hitAt = level;
+    else if (hitAt !== null && b.sliding && level > 0) slideAfterHit += DT; // sliding again while still on the berm
   }
-  return { highest, hitAt, crash };
+  return { highest, hitAt, crash, slideAfterHit };
 }
 
 test('sliding wide onto a berm while steering into the corner: drift up to 60% of its height, hit, held below the top', () => {
@@ -114,4 +115,40 @@ test('not steering, or steering the wrong way, you can still drift out over the 
     for (const at of corners) for (const kmh of [55, 70]) { runs++; if (slideOntoBerm(at, kmh, 25, 2, steering).highest > 1.5) over++; }
     assert.ok(over >= 0.8 * runs, `${steering}: out over the top in ${over} of ${runs}`);
   }
+});
+
+test('after a berm hit the tyres grip again: the berm guides you round without sliding', () => {
+  const after = [];
+  for (const at of corners) for (const kmh of [50, 60, 70]) for (const outDeg of [10, 25]) {
+    const r = slideOntoBerm(at, kmh, outDeg, 2, 'into');
+    if (r.hitAt !== null) after.push(r.slideAfterHit);
+  }
+  after.sort((a, b) => a - b);
+  // Before the tyres hooked up at the hit, the bike slid on along the berm for 1.5 s (median; worst
+  // 2.2 s). This rider holds full lock all the way, so at the berm's foot it can still slip a little.
+  const median = after[after.length >> 1], worst = after.at(-1);
+  assert.ok(median < 0.25, `median slide on the berm after the hit ${median.toFixed(2)} s`);
+  assert.ok(worst < 0.5, `worst slide on the berm after the hit ${worst.toFixed(2)} s`);
+});
+
+// Same bike, same place, one step apart from how it's turning: a slide sideways washes off speed,
+// leaning within grip doesn't.
+function oneSecond(slipV, lean) {
+  const b = createBikeState(), keys = { left: false, right: false, pedal: false, brake: false, hop: false };
+  placeBikeAt(b, T, 100, 55 / 3.6);
+  const ahead = T.pointAt(b.s + 0.6);
+  b.vy = (T.groundAt(ahead.x, ahead.z) - b.y) / 0.6 * b.v;
+  b.slipV = slipV;
+  for (let step = 0; step < 1 / DT; step++) { b.lean = lean; b.steerIn = 0; stepRide(b, keys, T, {}, true, DT); }
+  return b.v * 3.6;
+}
+
+test('drifting washes off speed; cornering with grip does not', () => {
+  const straight = oneSecond(0, 0), drift = oneSecond(3, 0), grip = oneSecond(0, 0.15);
+  // 3 m/s of slip at 55 km/h, fading as the tyres hook up, costs 0.44 km/h in a second (was 0):
+  // a light cost (Ben: rolling with grip should just feel a bit faster)
+  assert.ok(straight - drift > 0.3, `drift costs ${(straight - drift).toFixed(2)} km/h`);
+  // leaning within grip (0.15 rad asks for 1.5 m/s^2; tyres give 7.4) turns the bike onto a
+  // slightly different slope (0.002 km/h), but nothing is scrubbed
+  assert.ok(Math.abs(straight - grip) < 0.05, `grip cornering costs ${(straight - grip).toFixed(2)} km/h`);
 });
