@@ -15,6 +15,7 @@
 //    gentle terrace, so trail and hill stay level with each other.
 import { clamp, smoothstep } from './util.js';
 import { resolveJump, jumpProfile, SHAPE_KEYS } from './jumps.js';
+import { resolveRollers, rollerProfile, atCrest } from './rollers.js';
 import { createPath } from './path.js';
 
 export const SPLIT_COUNT = 4; // 3 splits + the finish: one high-score board each
@@ -45,6 +46,7 @@ export function defineTrail(data) {
   const hillWaves = waveList(data.hill.waves);
   const chutes = data.hill.chutes || [];
   const jumps = data.features.filter(f => f.type === 'jump').map(resolveJump).sort((a, b) => a.s - b.s);
+  const rollers = data.features.filter(f => f.type === 'rollers').map(resolveRollers).sort((a, b) => a.s - b.s);
   const berms = { auto: true, adjust: [], ...data.berms };
   const bermRamp = berms.fullCurvature - berms.startCurvature;
   const bankWidth = (data.width.min + data.width.max) / 2; // typical half width, for the far banks
@@ -68,11 +70,19 @@ export function defineTrail(data) {
     return h;
   }
 
-  // Height the jumps add along the trail (kickers, gaps, landings and their drops).
+  // Height the jumps and rollers add along the trail (kickers, gaps, landings and their drops).
   function jumpHeight(s) {
     let h = 0;
     for (const j of jumps) h += jumpProfile(j, s - j.s);
+    for (const r of rollers) h += rollerProfile(r, s - r.s);
     return h;
+  }
+
+  // Slope of the rollers here (rise per metre along the trail): what pumping works against.
+  function rollerSlope(s) {
+    let h = 0;
+    for (const r of rollers) h += rollerProfile(r, s + 0.25 - r.s) - rollerProfile(r, s - 0.25 - r.s);
+    return h / 0.5;
   }
 
   // Height of the riding line on the centreline, before the dish and berms.
@@ -86,6 +96,18 @@ export function defineTrail(data) {
     }
     return null;
   }
+
+  // Where a pop works: on a kicker, or right at a roller's crest. Returns { u } (metres from
+  // the lip or crest, negative before it), or null.
+  function popAt(s) {
+    const k = kickerAt(s);
+    if (k) return { u: k.u };
+    for (const r of rollers) { const u = atCrest(r, s); if (u !== null) return { u }; }
+    return null;
+  }
+  // On a roller set? There, letting go of compress away from a crest is just the pump
+  // extending (no hop), so pumping doesn't throw you into the next roller.
+  const onRollers = s => rollers.some(r => s > r.s && s < r.end);
 
   // Which part of a jump the point s is on: gap, knuckle, sweet, bottom, flat, or null.
   function jumpZone(s) {
@@ -176,8 +198,9 @@ export function defineTrail(data) {
 
   return {
     id: data.id, name: data.name, difficulty: data.difficulty, length, seed: data.seed, splits, start,
-    scenery: { rocky: [], ...data.scenery }, jumps, berms,
-    halfWidth, curvature, hillHeight, jumpHeight, lineHeight, kickerAt, jumpZone,
+    grade: data.hill.grade, // the hill's overall grade (the jump simulator rides jumps on it)
+    scenery: { rocky: [], ...data.scenery }, jumps, rollers, berms,
+    halfWidth, curvature, hillHeight, jumpHeight, lineHeight, kickerAt, popAt, onRollers, rollerSlope, jumpZone,
     bermAmount, bermHeight, ground, groundAt,
     // on the riding surface (full grip, low drag)? (x, z) is the same point in the world
     onTrail: (s, off) => Math.abs(off) <= halfWidth(s) + 0.3,
@@ -247,9 +270,10 @@ function checkTrail(data) {
   });
 
   if (!Array.isArray(data.features)) fail('features must be a list (it can be empty)');
-  const jumps = [];
+  const jumps = [], spans = [];
   for (const f of data.features) {
-    if (f.type !== 'jump') fail(`unknown feature type "${f.type}" (known: jump)`);
+    if (f.type === 'rollers') { spans.push(checkRollers(f, st, data.length, fail)); continue; }
+    if (f.type !== 'jump') fail(`unknown feature type "${f.type}" (known: jump, rollers)`);
     if (!isNumber(f.at)) fail('every jump needs an "at" distance');
     let j;
     try { j = resolveJump(f); } catch (e) { fail(`jump at ${f.at}: ${e.message}`); }
@@ -258,11 +282,32 @@ function checkTrail(data) {
     if (j.s - j.kick <= st.gate) fail(`jump at ${f.at}: its kicker starts before the start gate`);
     if (j.end > data.length) fail(`jump at ${f.at}: its landing runs past the end of the trail`);
     jumps.push(j);
+    spans.push({ from: j.s - j.kick, to: j.end, what: `jump at ${j.s}` });
   }
   jumps.sort((a, c) => a.s - c.s);
   for (let i = 1; i < jumps.length; i++) {
     if (jumps[i].s - jumps[i].kick <= jumps[i - 1].end) fail(`jump at ${jumps[i].s} starts before the landing of the jump at ${jumps[i - 1].s} ends`);
   }
+  spans.sort((a, c) => a.from - c.from);
+  for (let i = 1; i < spans.length; i++) {
+    if (spans[i].from <= spans[i - 1].to) fail(`${spans[i].what} overlaps the ${spans[i - 1].what}`);
+  }
+}
+
+// A roller set needs a whole number of humps (2 or more), a height and spacing in a sensible
+// range, room on the trail, and its expected outcomes. Returns the stretch it covers.
+function checkRollers(f, st, length, fail) {
+  const what = `rollers at ${f.at}`;
+  const isNumber = v => typeof v === 'number' && Number.isFinite(v);
+  if (!isNumber(f.at)) fail('every roller set needs an "at" distance');
+  if (!Number.isInteger(f.count) || f.count < 2) fail(`${what}: count must be a whole number of humps, 2 or more`);
+  if (!isNumber(f.height) || f.height < 0.2 || f.height > 1.5) fail(`${what}: height must be 0.2-1.5 m`);
+  if (!isNumber(f.spacing) || f.spacing < 6 || f.spacing > 20) fail(`${what}: spacing (crest to crest) must be 6-20 m`);
+  if (!Array.isArray(f.landings) || !f.landings.length) fail(`${what} must declare its expected outcomes (landings)`);
+  const to = f.at + f.count * f.spacing;
+  if (f.at <= st.gate) fail(`${what}: starts before the start gate`);
+  if (to > length) fail(`${what}: runs past the end of the trail`);
+  return { from: f.at, to, what };
 }
 
 // The detailed ground beside the trail reaches NEAR_REACH past the edge. On the inside of a

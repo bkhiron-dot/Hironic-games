@@ -12,7 +12,8 @@ export const HOLE_LENGTH = 1.5;
 const LANDING_LENGTH = 30, ROLLOVER_END = 0.2, PITCH_END = 0.5;
 
 // Landing ranges are speed at the lip in km/h, checked every 2 km/h. pop is extra upward
-// speed at the lip in m/s (3 = full pop). outcome is 'smooth', 'big crash', or 'not smooth'.
+// speed at the lip in m/s (3 = full pop). outcome is 'smooth', 'big crash', 'not smooth', 'clean'
+// (rolled over it or landed smooth) or 'no crash'.
 export const JUMP_KINDS = {
   // Normal jump: lands smooth at about 46-68 km/h without a pop.
   normal: {
@@ -50,6 +51,20 @@ export const JUMP_KINDS = {
       { pop: 3, from: 54, to: 66, outcome: 'smooth' },
       { pop: 3, from: 44, to: 48, outcome: 'big crash' }, // too slow even with a pop: cased
       { pop: 0, from: 46, to: 62, outcome: 'big crash' }, // no pop: cased
+    ],
+  },
+  // Tabletop (Jolly Green Giant): the gap is a flat deck at lip height, so coming up short
+  // just lands on the deck: nothing to case into. Clear the deck to land on the long, steep
+  // down-ramp (steep, because a pop at speed comes down at about -0.45).
+  // These ranges are on the simulator's standard -0.2 grade; Jolly Green Giant (-0.1) declares
+  // its own for each tabletop.
+  table: {
+    big: false, kick: 8, lip: 0.9, gap: 4.5, hole: 0.9, knuck: 0.9, pitch: 0.42, land: 24,
+    short: 4, sweet0: 4.5, sweet1: 14, long: 18,
+    landings: [
+      { pop: 0, from: 14, to: 62, outcome: 'clean' }, // no pop: rolled over or landed smooth
+      { pop: 3, from: 14, to: 44, outcome: 'smooth' },
+      { pop: 3, from: 52, to: 70, outcome: 'big crash' }, // popped far too fast: past the landing
     ],
   },
 };

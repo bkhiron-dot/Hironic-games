@@ -1,9 +1,10 @@
 // The trailhead: a flat clearing at the top of the hill where every run begins.
 //
-// withTrailhead(trail) returns the same trail with a level clearing cut into the hill just
+// withTrailhead(trail, built) returns the same trail with a level clearing cut into the hill just
 // above its start gate, fenced all round. Three start gates stand side by side on the
-// clearing's downhill edge (green, blue, black). Only the gate of the trail being ridden
-// is open; the others are taped off ("coming soon") until their trails are built.
+// clearing's downhill edge (green, blue, black). The gate of the trail being ridden is open,
+// and so is the gate of every other trail that's built (`built`: their difficulties): riding
+// through one of those switches to that trail. The rest are taped off ("coming soon").
 //
 // The clearing is laid out square to the trail at its start gate:
 //   u = metres past the gate line (negative = uphill, inside the clearing)
@@ -26,7 +27,7 @@ export const GATES = [
   { difficulty: 'black', name: 'Back in Black', colour: '#1b1b1b' },
 ];
 
-export function withTrailhead(trail) {
+export function withTrailhead(trail, built = []) {
   const gateS = trail.start.gate;
   const origin = trail.pointAt(gateS), h = trail.headingAt(gateS);
   const fx = Math.sin(h), fz = -Math.cos(h); // forward, down the trail
@@ -37,7 +38,11 @@ export function withTrailhead(trail) {
   // This trail's gate is in its slot; the clearing is centred on the middle gate.
   const slot = GATES.findIndex(g => g.difficulty === trail.difficulty);
   const centreV = -(slot - 1) * GATE_SPACING; // sideways from this trail's gate to the middle one
-  const gates = GATES.map((g, i) => ({ ...g, v: (i - 1) * GATE_SPACING, open: i === slot }));
+  const gates = GATES.map((g, i) => ({
+    ...g, v: (i - 1) * GATE_SPACING,
+    ridden: i === slot,                                      // this world's trail
+    open: i === slot || built.includes(g.difficulty),        // ridden, or another built trail
+  }));
 
   // World point (x, z) in clearing coordinates. v is measured from the centre gate.
   function local(x, z) {
@@ -96,7 +101,8 @@ export function withTrailhead(trail) {
   const keepClear = (x, z) => { const { u, v } = local(x, z); return outside(u, v) < CLEAR_MARGIN; };
 
   // Moving from (x0, z0) to (x1, z1): does the fence or a closed gate stop you?
-  // Returns null (carry on), { gate } for a closed gate, or { fence: true }.
+  // Returns null (carry on), { gate } for a closed gate, { fence: true }, or { switchTo: gate }
+  // when riding out through another built trail's gate.
   function blocked(x0, z0, x1, z1) {
     const a = local(x0, z0), b = local(x1, z1);
     const wasIn = outside(a.u, a.v) === 0, isIn = outside(b.u, b.v) === 0;
@@ -105,21 +111,24 @@ export function withTrailhead(trail) {
     const p = wasIn ? b : a;
     if (p.u > 0 && Math.abs(p.v) <= CLEARING_HALF_WIDTH) {
       const gate = gates.find(g => Math.abs(p.v - g.v) <= opening);
-      if (gate && gate.open) return null;
+      if (gate && gate.ridden) return null;
+      if (gate && gate.open) return wasIn ? { switchTo: gate } : null;
       if (gate) return { gate };
     }
     return { fence: true };
   }
 
   // Where a run from the trailhead begins: 8 m in from the back fence, in line with this
-  // trail's gate, facing it.
+  // trail's gate, facing it. After switching trails at a gate you carry on from just above
+  // this trail's gate (atGate).
   const dropIn = { ...world(-CLEARING_DEPTH + 8, gates[slot].v), h };
+  const atGate = { ...world(-1.5, gates[slot].v), h };
 
   return {
     ...trail,
     ground, groundAt, onTrail,
     trailhead: {
-      gates, opening, level, dropIn, heading: h,
+      gates, opening, level, dropIn, atGate, heading: h,
       halfWidth: CLEARING_HALF_WIDTH, depth: CLEARING_DEPTH,
       local, world, inClearing, padAmount, keepClear, blocked,
     },

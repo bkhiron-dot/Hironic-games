@@ -1,7 +1,7 @@
 // Hardline MTB: builds the world, wires the parts together and runs the frame loop.
 import './style.css';
 import { makeRandom } from './util.js';
-import { FLOW_MONSTER } from './trails/index.js';
+import { FLOW_MONSTER, TRAILS } from './trails/index.js';
 import { MAYDENA } from './parks.js';
 import { channelOf, versionLabel } from './version.js';
 import { withTrailhead } from './trailhead.js';
@@ -34,8 +34,12 @@ const { renderer, scene, camera, sun } = createScene(document.getElementById('ga
 
 // The world, built in v1's order. Terrain colours, forest and mountains share one
 // random sequence, so the order decides where every tree grows.
-// One trail at a time for now, with the trailhead clearing at its top.
-const trail = withTrailhead(FLOW_MONSTER);
+// One trail at a time, with the trailhead clearing at its top. Which one comes from the address
+// (?trail=jolly-green-giant), Flow Monster by default. Every built trail's gate is open: ride
+// through one and the game switches to that trail's world (switchTrail below).
+const params = new URLSearchParams(location.search);
+const raw = TRAILS.find(t => t.id === params.get('trail')) || FLOW_MONSTER;
+const trail = withTrailhead(raw, TRAILS.map(t => t.difficulty));
 const random = makeRandom(trail.seed);
 buildTerrain(scene, renderer, trail, random);
 const forestPlan = planForest(trail, random);
@@ -59,13 +63,24 @@ const keys = createInput({
   onEndRun: () => run.endRun('restart'),
   onStart: () => run.startRun(run.state === 'done' ? 'gate' : 'trailhead'), // Enter: drop in, or ride again
 });
-run = createRun({ b, keys, trail, scene, chassis, rider, treeBuckets: forestPlan.treeBuckets, hud, scores, chaseCamera, effects: dirt });
+// Riding out through another trail's gate: fade out, remember the speed, and load that trail's
+// world. It carries on from just above its own gate (see `arrived` below).
+const SWITCH_KEY = 'hardline-mtb-switch';
+function switchTrail(gate, speed) {
+  const next = TRAILS.find(t => t.difficulty === gate.difficulty);
+  try { sessionStorage.setItem(SWITCH_KEY, JSON.stringify({ trail: next.id, speed, at: Date.now() })); } catch { /* no storage: start at rest */ }
+  document.getElementById('fade').classList.add('show');
+  hud.toast(next.name);
+  setTimeout(() => { const url = new URL(location.href); url.searchParams.set('trail', next.id); location.replace(url); }, 450);
+}
+run = createRun({ b, keys, trail, scene, chassis, rider, treeBuckets: forestPlan.treeBuckets, hud, scores, chaseCamera, effects: dirt, switchTrail });
 // Start screen: the park and which version this is (the live game, or the test version on a preview).
 document.getElementById('parkLine').textContent = MAYDENA.name + ', ' + MAYDENA.place.split(',')[0];
 document.getElementById('versionLine').textContent = versionLabel(channelOf(location));
 document.getElementById('startBtn').addEventListener('click', () => run.startRun('trailhead'));
 document.getElementById('againBtn').addEventListener('click', () => run.startRun('gate'));
 document.getElementById('trailheadBtn').addEventListener('click', () => run.startRun('trailhead'));
+
 
 /* ---------- Frame loop ---------- */
 let last = performance.now(), menuTime = 0, crankAngle = 0;
@@ -111,5 +126,12 @@ function frame(now) {
 // Adding ?debug to the address hands the game's state to testing tools (screenshots, tuning).
 if (new URLSearchParams(location.search).has('debug')) window.hardline = { b, keys, run, trail, dirt, tracks, chaseCamera, camera };
 
-run.resetRun();
+run.resetRun(); // the start screen's view: at the drop-in
+// Just switched here through a gate (within the last 10 s): carry straight on, no start screen.
+let arrived = null;
+try { arrived = JSON.parse(sessionStorage.getItem(SWITCH_KEY)); sessionStorage.removeItem(SWITCH_KEY); } catch { /* none */ }
+if (arrived && arrived.trail === trail.id && Date.now() - arrived.at < 10000) {
+  run.startRun('switched', Math.max(0, Math.min(25, arrived.speed || 0)));
+  hud.toast(trail.name);
+}
 requestAnimationFrame(frame);

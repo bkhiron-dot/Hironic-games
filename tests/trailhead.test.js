@@ -3,14 +3,15 @@
 // off it without moving the rest, and a rider can drop in and ride to the finish.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FLOW_MONSTER as RAW } from '../src/trails/index.js';
+import { FLOW_MONSTER as RAW, JOLLY_GREEN_GIANT, TRAILS } from '../src/trails/index.js';
 import { withTrailhead } from '../src/trailhead.js';
 import { makeRandom } from '../src/util.js';
 import { terrainData } from '../src/terrain.js';
 import { planForest } from '../src/forest.js';
 import { rideTrail } from './helpers/ride.js';
 
-const T = withTrailhead(RAW), th = T.trailhead;
+const BUILT = TRAILS.map(t => t.difficulty); // the trails that exist: their gates are open
+const T = withTrailhead(RAW, BUILT), th = T.trailhead;
 
 test('the clearing is level with the trail at the start gate, all over', () => {
   assert.ok(Math.abs(th.level - RAW.ground(RAW.start.gate, 0)) < 1e-9);
@@ -52,18 +53,33 @@ test('past the gate the trail is untouched (from 3 m on); the clearing only resh
   }
 });
 
-test('three gates, green, blue and black, left to right; only Flow Monster is open', () => {
-  assert.deepEqual(th.gates.map(g => [g.difficulty, g.name, g.open]),
-    [['green', 'Jolly Green Giant', false], ['blue', 'Flow Monster', true], ['black', 'Back in Black', false]]);
+test('three gates, green, blue and black, left to right; Flow Monster ridden, the others open to switch', () => {
+  assert.deepEqual(th.gates.map(g => [g.difficulty, g.name, g.ridden, g.open]),
+    [['green', 'Jolly Green Giant', false, true], ['blue', 'Flow Monster', true, true], ['black', 'Back in Black', false, true]]);
   const cross = v => { const a = th.world(-0.2, v), b = th.world(0.2, v); return th.blocked(a.x, a.z, b.x, b.z); };
   assert.equal(cross(0), null, 'through the blue gate');
-  assert.equal(cross(-15).gate.name, 'Jolly Green Giant');
-  assert.equal(cross(15).gate.name, 'Back in Black');
+  assert.equal(cross(-15).switchTo.name, 'Jolly Green Giant', 'out through the green gate: switch trail');
+  assert.equal(cross(15).switchTo.name, 'Back in Black', 'out through the black gate: switch trail');
+  // a trail not built yet keeps its gate taped off
+  const blueOnly = withTrailhead(RAW, ['blue']).trailhead;
+  const a = blueOnly.world(-0.2, 15), b = blueOnly.world(0.2, 15);
+  assert.equal(blueOnly.blocked(a.x, a.z, b.x, b.z).gate.name, 'Back in Black');
   assert.deepEqual(cross(22), { fence: true }, 'between gates');
   const back = [th.world(-th.depth + 0.2, 0), th.world(-th.depth - 0.2, 0)];
   assert.deepEqual(th.blocked(back[0].x, back[0].z, back[1].x, back[1].z), { fence: true }, 'back fence');
   const side = [th.world(-10, th.halfWidth - 0.2), th.world(-10, th.halfWidth + 0.2)];
   assert.deepEqual(th.blocked(side[0].x, side[0].z, side[1].x, side[1].z), { fence: true }, 'side fence');
+});
+
+test('in Jolly Green Giant\'s world the same gates: green ridden (on the left), blue and black open to switch', () => {
+  const green = withTrailhead(JOLLY_GREEN_GIANT, BUILT).trailhead;
+  assert.deepEqual(green.gates.map(g => [g.difficulty, g.ridden, g.open]), [['green', true, true], ['blue', false, true], ['black', false, true]]);
+  const cross = v => { const a = green.world(-0.2, v), b = green.world(0.2, v); return green.blocked(a.x, a.z, b.x, b.z); };
+  assert.equal(cross(-15), null, 'through the green gate');
+  assert.equal(cross(0).switchTo.name, 'Flow Monster');
+  // after a switch the rider carries on from just above this trail's own gate
+  const at = green.local(green.atGate.x, green.atGate.z);
+  assert.ok(Math.abs(at.u + 1.5) < 1e-9 && Math.abs(at.v + 15) < 1e-9, `arrives at u ${at.u}, v ${at.v}`);
 });
 
 test('no plants on the clearing; the rest of the forest is where it was', () => {

@@ -28,6 +28,9 @@ body{background:var(--forest);color:var(--ink);font-family:var(--body);padding-l
 .panel.split{text-align:right}
 .toast{position:fixed;left:50%;top:calc(84px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:0;padding:8px 14px;font:700 22px/1.1 var(--display);letter-spacing:.03em;opacity:0;transition:opacity .25s;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1}
+/* switching trails at a gate: fade to black while the other trail's world loads */
+.fade{position:fixed;inset:0;background:#000;opacity:0;transition:opacity .4s;pointer-events:none}
+.fade.show{opacity:1}
 .pads{display:none;justify-content:space-between;align-items:flex-end;gap:12px;pointer-events:none}
 .coarse .pads{display:flex}
 .cluster{display:flex;gap:12px;align-items:flex-end;pointer-events:auto}
