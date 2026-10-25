@@ -9,6 +9,10 @@ A refinement (a trail line, a jump, the physics) is a minor version: 1.1, 1.2 an
 
 ## next
 
+- **3.0**: Back in Black, the black trail.
+  - 1.15 km, steeper (-0.22) and narrower.
+  - Nine mandatory gaps: gaps, step-downs, a drop and step-ups. Ride them fast, or pop them if you're slower; too slow and you case.
+  - Its gate at the trailhead is open.
 - **2.0**: Jolly Green Giant, the green trail.
   - 1.1 km, wide and gentle.
   - Pump rollers, gap sets you can pop, and five tabletops growing toward the bottom.

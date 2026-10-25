@@ -43,6 +43,12 @@ Agreed with Ben on 24 Oct 2026. This is a separate game from v1; v1 scores are n
 - Ben (24 Oct): all mandatory gaps, with a range of gap, step-down and step-up features. No B lines.
 - Steeper, narrower trail. Main track surface stays smooth dirt (no rock gardens or roots on the line).
 - Every feature needs a simulated sweet range (reachable on the trail) and a test.
+- **As built (next 3.0, 26 Oct, overnight; numbers to review with Ben):**
+  - **Trail:** 1150 m at grade -0.22, half width 2.2-3.6 m, 2 m berms.
+  - **Long straights between open bends (76 m radius or more).** Twistier lines made steep banks beside the trail on this steeper hill and put landings into bends.
+  - **Nine mandatory gaps:** 4 gaps, 2 step-downs, 1 drop, 2 step-ups.
+  - **Shapes:** all built from Flow Monster's first-jump shape, with the landing moved down or up.
+  - **Pop or ride:** each feature has a no-pop window and a pop window that join. Riding flat out you reach every lip at least 6 km/h inside its range: ride the fast ones, pop the slower ones (420, 1040 m and the step-up at 330 m).
 
 ## Scores
 
