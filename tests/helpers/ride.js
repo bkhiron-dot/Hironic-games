@@ -20,12 +20,16 @@ export function steerAlongTrail(b, keys, line = 0, trail = T) {
   steerAt(b, keys, trail.pointAt(b.s + 8, line));
 }
 
-// Steer toward a world point.
+// Steer toward a world point, leaning just enough for the arc that reaches it (like a rider
+// easing into a turn): full lock for every small error makes the tyres drift at speed.
 function steerAt(b, keys, target) {
-  let err = Math.atan2(target.x - b.x, b.z - target.z) - b.h;
+  const dx = target.x - b.x, dz = b.z - target.z, dist = Math.max(4, Math.hypot(dx, dz));
+  let err = Math.atan2(dx, dz) - b.h;
   err = Math.atan2(Math.sin(err), Math.cos(err));
-  keys.right = err > 0.03;
-  keys.left = err < -0.03;
+  // an arc through the target needs sideways acceleration 2 v^2 sin(err) / dist; lean = atan(a / g)
+  const want = Math.atan(2 * b.v * b.v * Math.sin(err) / dist / 9.8);
+  keys.right = b.lean < want - 0.03;
+  keys.left = b.lean > want + 0.03;
 }
 
 // What a rider does with the bars: follow the trail; on a kicker, aim at the middle of the
