@@ -90,12 +90,12 @@ Jump shapes and their declared landing ranges live in `src/jumps.js` and are che
 
 | Jump | Smooth | Notes |
 |---|---|---|
-| Normal (177 m) | 46-68 no pop, 34-52 pop | lip 1.1 m, gap 6 m, landing 30 m. Too fast: small crash at 76, big crash from 78 km/h |
-| Normal, reshaped (743 m) | 52-80 no pop, 36-60 pop | Ben overshot it with no pop (twice at 30 m, again at 33 m). A longer landing alone didn't help (its slope stays the same), so: kicker 12 m (was 9, same 1.1 m lip: flatter flight), landing 37 m. No pop: heavy 48-50 and 82-86, small crash 46 and 88, big crash below 46. Pop: heavy 34 and 62-68, small crash 70-72, big crash from 74. Trail below sits 1.36 m lower than v1 |
+| Normal, stretched (177 m) | 64-88 no pop, 48-68 pop | Ben pops through the start gate from a rolling start: lip at 66-68 km/h, and a pop overshot. Kicker 12 m, gap 8.5 m, landing 38 m. No pop: heavy 60-62, small crash 58, cased below 58. Pop: heavy 44-46 and 70-76, big crash from 82 |
+| Normal, stretched (743 m) | 74-90 no pop, 54-78 pop | Ben reaches it at 72-78 km/h and pops it; it overshot at landing 30, 33 and (kicker 12 m) 37 m. Kicker 14 m, gap 9.5 m, landing 44 m. No pop: heavy 68-72, small crash 66, cased below 66. Pop: heavy 50-52 and 80-86 |
 | Big, pop optional (438 m) | 52-66 no pop, 46-54 pop | lip 1.5 m, gap 8.5 m (was 9; tuning round 2), 42 m landing |
 | Big, needs pop, kind `bigPop` (1037 m) | 54-66 pop; no pop cases | Shaped with Ben (tuning rounds 2-4): kicker 12 m, lip 1.8 m, gap 12 m, knuckle 2.4 m, landing 48 m at pitch 0.7. Sweet spot 12.3-30.1 m past the lip. Round 3's 2.2 m lip overshot with a pop at speed; this one is built for a fast pop (lip reachable at about 62 on Flow Monster) |
 
-Fastest reachable lip speed on Flow Monster (flat out, 300 m run-up, steering only, scripted rider): 177 m about 70, 438 m about 56, 743 m about 77, 1037 m about 63 km/h. So the "pop optional" jump lands without a pop at 52-56 km/h on Flow Monster. These are conservative: Ben has reached the last lip at 66 km/h (scripted rider about 61-63), so leave headroom above them when shaping a jump.
+Fastest reachable lip speed on Flow Monster (flat out from the trailhead drop-in, pedalling all the way, scripted rider): 177 m about 68, 438 m about 55-61, 743 m about 74-78, 1037 m about 64-66 km/h. So the "pop optional" jump lands without a pop at 52-56 km/h on Flow Monster. These are conservative: Ben has reached the last lip at 66 km/h (scripted rider about 61-63), so leave headroom above them when shaping a jump.
 
 Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diagonal) was ridden 15.5% long and landed smooth at about 53-79 km/h instead of 46-68. With `s` along the path it now lands smooth from 46 km/h in the game.
 
