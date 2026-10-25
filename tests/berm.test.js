@@ -80,7 +80,8 @@ function slideOntoBerm(at, kmh, outDeg, slip, steering) {
   const dir = { into: corner, none: 0, wrong: -corner }[steering];
   Object.assign(b, { slipV: -corner * slip, slideMem: 1, slidePeak: 0.6, steerIn: dir, lean: dir * 0.8 });
   keys.right = dir > 0; keys.left = dir < 0;
-  let highest = 0, hitAt = null, crash = null, slideAfterHit = 0;
+  let highest = 0, hitAt = null, crash = null, slideAfterHit = 0, sinceHit = 0;
+  const rail = { low: 1, high: 0, drift: 0, offLine: 0 }; // from 0.3 s after the hit, while on the full berm
   for (let step = 0; step < 3 / DT && b.s < s0 + 40; step++) {
     const events = stepRide(b, keys, T, {}, true, DT);
     crash = events.find(e => e.type === 'crash') || crash;
@@ -90,8 +91,13 @@ function slideOntoBerm(at, kmh, outDeg, slip, steering) {
     highest = Math.max(highest, level);
     if (hitAt === null && events.some(e => e.type === 'bermHit')) hitAt = level;
     else if (hitAt !== null && b.sliding && level > 0) slideAfterHit += DT; // sliding again while still on the berm
+    if (hitAt !== null && (sinceHit += DT) > 0.3 && T.bermAmount(L.s) > 1.5) {
+      let offLine = T.headingAt(L.s) - b.h; offLine = Math.abs(Math.atan2(Math.sin(offLine), Math.cos(offLine)));
+      Object.assign(rail, { low: Math.min(rail.low, level), high: Math.max(rail.high, level),
+        drift: Math.max(rail.drift, Math.abs(b.drift)), offLine: Math.max(rail.offLine, offLine) });
+    }
   }
-  return { highest, hitAt, crash, slideAfterHit };
+  return { highest, hitAt, crash, slideAfterHit, rail };
 }
 
 test('sliding wide onto a berm while steering into the corner: drift up to 60% of its height, hit, held below the top', () => {
@@ -151,4 +157,19 @@ test('drifting washes off speed; cornering with grip does not', () => {
   // leaning within grip (0.15 rad asks for 1.5 m/s^2; tyres give 7.4) turns the bike onto a
   // slightly different slope (0.002 km/h), but nothing is scrubbed
   assert.ok(Math.abs(straight - grip) < 0.05, `grip cornering costs ${(straight - grip).toFixed(2)} km/h`);
+});
+
+test('after a berm hit, steering in, the bike rails the berm: straight, on the corner\'s line, holding its height', () => {
+  let railed = 0;
+  for (const at of corners) for (const kmh of [50, 60, 70]) for (const outDeg of [10, 25]) {
+    const r = slideOntoBerm(at, kmh, outDeg, 2, 'into'), where = `berm at ${at}, ${kmh} km/h, ${outDeg} deg out`;
+    if (r.hitAt === null || r.rail.high === 0) continue;
+    railed++;
+    // drawn drift angle gone (it was 10-20 degrees on after a hit), pointing along the corner
+    assert.ok(r.rail.drift < 0.05, `${where}: drawn drift ${(r.rail.drift * 57.3).toFixed(1)} deg`);
+    assert.ok(r.rail.offLine < 0.1, `${where}: ${(r.rail.offLine * 57.3).toFixed(1)} deg off the corner's line`);
+    // stays up on the berm: doesn't dive off it to the inside, or ride up over the top
+    assert.ok(r.rail.low > 0.35 && r.rail.high < 0.95, `${where}: held between ${r.rail.low.toFixed(2)} and ${r.rail.high.toFixed(2)} of the height`);
+  }
+  assert.ok(railed >= 40, `railed ${railed} corners`);
 });

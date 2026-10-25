@@ -29,6 +29,7 @@ const BERM_HOLD_STEER = 0.3;      // berm hold: steering at least 30% into the c
 const BERM_HOLD_MIN = 0.3;        // ...on a berm at least 0.3 m high...
 const BERM_HOLD_RATE = 4;         // ...turns the bike toward the berm's line at 4 per second (63% in 0.25 s)...
 const BERM_HOLD_SLIP_DECAY = 12;  // ...and stops a slide (slip x exp(-12 dt): 95% gone in 0.25 s)
+const BERM_RAIL_RATE = 8;         // railing a berm after a hit: the bike follows the berm's line at 8 per second
 const BERM_HIT_MIN = 0.3;   // sliding into a berm harder than this (slide 0..1) is a "hit"...
 const BERM_HIT_SWING = 0.6; // ...which swings the bike 60% of the way to the berm's direction
 
@@ -189,14 +190,28 @@ function corner(b, trail, s, off, dt, toast, events) {
     // and brings the bike round to run along it (it can't understeer off the top). Not steering,
     // or steering the wrong way, there's no hold: you can still drift out over the top.
     const intoCorner = corner !== 0 && Math.sign(b.steerIn) === corner && Math.abs(b.steerIn) >= BERM_HOLD_STEER;
-    const holding = onBerm && aboveCatch && intoCorner && trail.onTrail(s, off, b.x, b.z);
+    const onTrail = trail.onTrail(s, off, b.x, b.z);
+    // Railing: after a berm hit (hooked), steering into the corner, the berm sets the line. The bike
+    // follows the corner at the height it was caught, instead of turning tighter than the corner
+    // and dropping off the berm (Ben's playtest of #19). Aimed a little ahead so it doesn't lag.
+    const railing = b.hooked && bermLevel > 0 && intoCorner && onTrail;
+    const holding = railing || (onBerm && aboveCatch && intoCorner && onTrail);
     b.pressed = holding; // the berm presses the bike into it (see flyOrFollowGround)
     if (holding) {
       b.slide = 0; b.sliding = false; aUse = aDemand;
       b.slipV *= Math.exp(-BERM_HOLD_SLIP_DECAY * dt);
       let along = trail.headingAt(s) - b.h; // how far the bike points away from the berm's line
+      if (railing) {
+        // aim a little ahead at the same height up the berm (the same share of the trail's width, so a
+        // narrowing trail doesn't carry the bike over the top), kept below 80% of the berm's height
+        // (a point L ahead on a curve leads by about L x curvature / 2, so L = 2 v / rate cancels the lag)
+        const ahead = s + 2 * b.v / BERM_RAIL_RATE, share = Math.min(0.9, out);
+        const aim = trail.pointAt(ahead, -corner * share * trail.halfWidth(ahead));
+        along = Math.atan2(aim.x - b.x, b.z - aim.z) - b.h;
+      }
       along = Math.atan2(Math.sin(along), Math.cos(along));
-      if (Math.sign(along) === corner) b.h += along * Math.min(1, BERM_HOLD_RATE * dt); // pointing out: bring it round
+      if (railing) b.h += along * Math.min(1, BERM_RAIL_RATE * dt); // on the berm's line, either way
+      else if (Math.sign(along) === corner) b.h += along * Math.min(1, BERM_HOLD_RATE * dt); // pointing out: bring it round
     }
     if (onBerm && aboveCatch && b.slideMem > 0) {
       // Berm hit: sliding into the wall, the tyres dig in and the berm turns you: the bike
@@ -232,8 +247,11 @@ function corner(b, trail, s, off, dt, toast, events) {
     // degrees, so a long slide at low speed doesn't snowball (at most 0.6 m/s^2 on the trail).
     const slipSin = Math.min(DRIFT_SCRUB_MAX_SIN, Math.abs(b.slipV) / Math.hypot(b.v, b.slipV));
     b.v = Math.max(0, b.v - DRIFT_SCRUB * G * muRoll * SLIDE_GRIP * slipSin * dt);
-    b.h += clamp(aUse / b.v, -2.6, 2.6) * dt;
-    b.drift += (turn * Math.max(b.slide, onBerm && b.slideMem > 0 ? 0.35 * b.slideMem : 0) * 0.55 - b.drift) * Math.min(1, dt * 6);
+    if (!railing) b.h += clamp(aUse / b.v, -2.6, 2.6) * dt; // railing: the berm turns the bike (above)
+    // Drawn drift angle (and the roost that goes with it): a slide, or the tail still out after one on a
+    // berm. Hooked up after a berm hit, the bike straightens quickly: it's railing, not drifting.
+    const driftTarget = b.hooked ? 0 : turn * Math.max(b.slide, onBerm && b.slideMem > 0 ? 0.35 * b.slideMem : 0) * 0.55;
+    b.drift += (driftTarget - b.drift) * Math.min(1, dt * (b.hooked ? 12 : 6));
   } else {
     // walking pace: steer directly
     b.h += b.steerIn * 2.0 * dt; b.drift *= 0.9; b.slipV *= 0.9;
