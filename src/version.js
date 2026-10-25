@@ -6,7 +6,7 @@
 //  - every release to main does the same to main's number, by what the release brings.
 // Both numbers live here (next carries main's too, so a release just bumps `main`).
 // CHANGELOG.md lists what each version changed.
-export const VERSIONS = { main: '1.1', next: '1.3' };
+export const VERSIONS = { main: '1.2', next: '1.3' };
 
 // Which build this is, from the address it's served at: the live game (main), a preview
 // (next, at .../preview/pr-N/), or anything else (a local dev server).
