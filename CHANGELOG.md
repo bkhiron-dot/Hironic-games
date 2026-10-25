@@ -9,6 +9,9 @@ A refinement (a trail line, a jump, the physics) is a minor version: 1.1, 1.2 an
 
 ## next
 
+- **1.3**
+  - Drift grows with speed and steering: none below 20 km/h, full from 50 km/h. It used to be strongest at low speed.
+  - A rider gripping on a berm gets its full support, so a fast mid-line through a wide berm (like the final one) doesn't drift.
 - **1.2**
   - Start screen shows the game's name, the producer (Hironic Games), the park (Maydena Bike Park, Tasmania) and the version.
   - Bike parks added as data, so more parks can be added later.
