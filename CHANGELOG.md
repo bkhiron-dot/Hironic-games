@@ -31,6 +31,9 @@ A refinement (a trail line, a jump, the physics) is a minor version: 1.1, 1.2 an
 
 ## main
 
+- **2.0**: next 2.0 and 3.0.
+  - Two new trails: Jolly Green Giant (green: rollers, pumping, tabletops) and Back in Black (black: nine mandatory gaps).
+  - Ride through a gate at the trailhead to switch trail.
 - **1.2** (release PR #24): next 1.2-1.3.
   - Start screen with the name, the producer, the park and the version.
   - Drift grows with speed (none below 20 km/h).
