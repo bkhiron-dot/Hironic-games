@@ -173,3 +173,44 @@ test('after a berm hit, steering in, the bike rails the berm: straight, on the c
   }
   assert.ok(railed >= 40, `railed ${railed} corners`);
 });
+
+// Full lock for a second on Flow Monster's flat dirt at `kmh`: the most sideways slip it builds.
+function lockSlip(kmh) {
+  const b = createBikeState(), keys = { left: false, right: false, pedal: false, brake: false, hop: false };
+  placeBikeAt(b, T, 100, kmh / 3.6);
+  const ahead = T.pointAt(b.s + 0.6);
+  b.vy = (T.groundAt(ahead.x, ahead.z) - b.y) / 0.6 * b.v;
+  let peak = 0;
+  for (let step = 0; step < 1 / DT; step++) { b.steerIn = 1; b.lean = 0.8; stepRide(b, keys, T, {}, true, DT); peak = Math.max(peak, Math.abs(b.slipV)); }
+  return peak;
+}
+
+test('drift grows with speed: none at low speed, more the faster you go (Ben)', () => {
+  // was 5 m/s of slip at every speed (and most at low speed)
+  const slow = lockSlip(15); // it speeds up on the slope, just past 20 km/h by the end
+  assert.ok(slow < 0.1, `no drift at 15 km/h (${slow.toFixed(3)} m/s)`);
+  const slips = [25, 30, 40].map(lockSlip);
+  assert.ok(slips[0] < slips[1] && slips[1] < slips[2], `slip builds with speed: ${slips.map(v => v.toFixed(1)).join(', ')} m/s`);
+});
+
+test('a fast mid-line through a wide berm grips: no drift (Ben: the final berm)', () => {
+  // Ride the last berm (1255-1295 m, half width about 4.5 m) on a line 50-70% of the way out,
+  // leaning just enough for the line ahead. Was sliding for 0.3-0.9 s at 55-75 km/h.
+  for (const share of [0.5, 0.7]) for (const kmh of [55, 65, 75]) {
+    const b = createBikeState(), keys = { left: false, right: false, pedal: false, brake: false, hop: false };
+    placeBikeAt(b, T, 1236, kmh / 3.6);
+    const ahead = T.pointAt(b.s + 0.6);
+    b.vy = (T.groundAt(ahead.x, ahead.z) - b.y) / 0.6 * b.v;
+    let slid = 0;
+    for (let step = 0; step < 6 / DT && b.s < 1300; step++) {
+      const s = b.s + 8, c = Math.sign(T.curvature(s)), aim = T.pointAt(s, -c * share * T.halfWidth(s));
+      let e = Math.atan2(aim.x - b.x, b.z - aim.z) - b.h;
+      e = Math.atan2(Math.sin(e), Math.cos(e));
+      const want = Math.atan(2 * b.v * b.v * Math.sin(e) / 8 / 9.8); // lean for the arc to the aim point
+      keys.right = b.lean < want - 0.03; keys.left = b.lean > want + 0.03;
+      stepRide(b, keys, T, {}, true, DT);
+      if (b.s > 1250 && b.sliding) slid += DT;
+    }
+    assert.ok(slid < 0.05, `line ${share}, ${kmh} km/h: slid ${slid.toFixed(2)} s`);
+  }
+});

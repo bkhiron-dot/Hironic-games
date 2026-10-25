@@ -2,6 +2,8 @@
 import './style.css';
 import { makeRandom } from './util.js';
 import { FLOW_MONSTER } from './trails/index.js';
+import { MAYDENA } from './parks.js';
+import { channelOf, versionLabel } from './version.js';
 import { withTrailhead } from './trailhead.js';
 import { createScene, buildMountains, followWithSun } from './scene.js';
 import { buildTerrain } from './terrain.js';
@@ -58,6 +60,9 @@ const keys = createInput({
   onStart: () => run.startRun(run.state === 'done' ? 'gate' : 'trailhead'), // Enter: drop in, or ride again
 });
 run = createRun({ b, keys, trail, scene, chassis, rider, treeBuckets: forestPlan.treeBuckets, hud, scores, chaseCamera, effects: dirt });
+// Start screen: the park and which version this is (the live game, or the test version on a preview).
+document.getElementById('parkLine').textContent = MAYDENA.name + ', ' + MAYDENA.place.split(',')[0];
+document.getElementById('versionLine').textContent = versionLabel(channelOf(location));
 document.getElementById('startBtn').addEventListener('click', () => run.startRun('trailhead'));
 document.getElementById('againBtn').addEventListener('click', () => run.startRun('gate'));
 document.getElementById('trailheadBtn').addEventListener('click', () => run.startRun('trailhead'));

@@ -22,6 +22,7 @@ const TAKEOFF_MARGIN = 0.005;
 const SLIDE_GRIP = 0.9;  // sliding tyres grip 90% as well as rolling ones (Ben: drift wide more)...
 const SLIP_GAIN = 2.0;   // ...and the slide builds sideways speed this fast (was 0.55)...
 const SLIP_MAX = 5;      // ...up to 5 m/s (was 4)
+const DRIFT_FROM = 20 / 3.6, DRIFT_FULL = 50 / 3.6; // no drift below 20 km/h, building to full drift at 50 (Ben)
 const DRIFT_SCRUB_MAX_SIN = 0.3; // drift scrub uses the slip angle, up to sin 0.3 (17 degrees)
 const DRIFT_SCRUB = 0.3;  // ...using 30% of the sliding tyres' friction: rolling with grip is a bit faster (Ben)
 const BERM_CATCH_LEVEL = 0.6;     // a slide is caught 60% of the way up the berm's height
@@ -166,21 +167,29 @@ function corner(b, trail, s, off, dt, toast, events) {
     const aboveCatch = bermLevel >= BERM_CATCH_LEVEL;
     // Still sliding below the catch line, the lower berm doesn't stop you: you keep understeering
     // and drifting wide up it, gripping like flat dirt, until the berm catches you higher up.
+    // Only while actually sliding: a rider gripping on the berm (say riding its mid-line) gets
+    // its full support, even just after a small slide (Ben: ride a wide berm fast, no drift).
     // Once the berm has caught you (hooked), it supports you all the way round, even lower down.
     if (bermLevel === 0) b.hooked = false; // off the berm: back to ordinary riding
-    const climbing = b.slideMem > 0 && !b.hooked && bermLevel > 0 && !aboveCatch;
+    const climbing = b.sliding && !b.hooked && bermLevel > 0 && !aboveCatch;
     const grip = climbing ? Math.min(tanBank, 0) : tanBank;
     const aMax = G * (mu + grip) / (1 - mu * grip);
     b.grip = Math.abs(aDemand) / aMax;
     let aUse = aDemand;
-    if (Math.abs(aDemand) <= aMax) b.sliding = false; // within grip: the tyres hook up again
-    else {
+    // How readily the tyres drift: not at all below 20 km/h (asking too much just runs you a
+    // little wide), building to fully at 50 km/h. The drift also grows with how hard you steer
+    // past the grip (the excess).
+    const driftScale = clamp((b.v - DRIFT_FROM) / (DRIFT_FULL - DRIFT_FROM), 0, 1);
+    if (Math.abs(aDemand) <= aMax || driftScale === 0) {
+      b.sliding = false; // within grip (or too slow to drift): the tyres hook up again
+      if (Math.abs(aDemand) > aMax) aUse = turn * aMax; // slow and asking too much: turn as hard as grip allows
+    } else {
       // Drift: the tyres let go, the rear steps out and you slide sideways toward the
       // outside of the corner (the speed it washes off is worked out below, from the slip).
       const excess = Math.abs(aDemand) - aMax;
       aUse = turn * aMax;
-      b.slide = Math.min(1, excess / aMax * 1.5);
-      b.slipV = clamp(b.slipV - turn * excess * SLIP_GAIN * dt, -SLIP_MAX, SLIP_MAX);
+      b.slide = Math.min(1, excess / aMax * 1.5 * driftScale);
+      b.slipV = clamp(b.slipV - turn * excess * SLIP_GAIN * driftScale * dt, -SLIP_MAX, SLIP_MAX);
       b.sliding = true;
       b.slideMem = 1;
       b.slidePeak = Math.max(b.slidePeak, b.slide);

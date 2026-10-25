@@ -25,11 +25,14 @@ permissions:
 
 jobs:
   build:
-    # pull request events only matter for pull requests that have (or just lost) the label
+    # Pull request events only matter for pull requests that have (or just lost) the label.
+    # A release merged into main is skipped: the push to main rebuilds the whole site anyway,
+    # and this run, starting in the same second, used to cancel that publish (25 Oct, #14, #22).
     if: >-
       github.event_name != 'pull_request_target' ||
-      contains(github.event.pull_request.labels.*.name, 'preview') ||
-      github.event.label.name == 'preview'
+      (!(github.event.action == 'closed' && github.event.pull_request.merged && github.event.pull_request.base.ref == 'main') &&
+       (contains(github.event.pull_request.labels.*.name, 'preview') ||
+        github.event.label.name == 'preview'))
     runs-on: ubuntu-latest
     # One build at a time; a newer one replaces an older one. Every build makes the whole site
     # (main plus all current previews), so the newest is always complete. This is set on the
