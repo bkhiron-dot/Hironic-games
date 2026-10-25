@@ -22,6 +22,13 @@ const TAKEOFF_MARGIN = 0.005;
 const SLIDE_GRIP = 0.9;  // sliding tyres grip 90% as well as rolling ones (Ben: drift wide more)...
 const SLIP_GAIN = 2.0;   // ...and the slide builds sideways speed this fast (was 0.55)...
 const SLIP_MAX = 5;      // ...up to 5 m/s (was 4)
+// Pumping rollers (Jolly Green Giant): holding compress (Space / Pump) down the back of a roller
+// pushes the bike on, by 2.5 x g x how steep the back is; holding it up the face costs 0.5 x g x
+// its slope. Tuned so pumping a set matches pedalling at 20-30 km/h and beats it from 40 (pedalling
+// fades out there). It's stronger than the plain physics (0.35 was the starting guess) because a
+// real rider's whole body does the work. The face cost is kept small (not half the gain): at
+// 1.25 a slow rider holding Space all the way stalled on a roller face.
+const PUMP_GAIN = 2.5, PUMP_COST = 0.5;
 const DRIFT_FROM = 20 / 3.6, DRIFT_FULL = 50 / 3.6; // no drift below 20 km/h, building to full drift at 50 (Ben)
 const DRIFT_SCRUB_MAX_SIN = 0.3; // drift scrub uses the slip angle, up to sin 0.3 (17 degrees)
 const DRIFT_SCRUB = 0.3;  // ...using 30% of the sliding tyres' friction: rolling with grip is a bit faster (Ben)
@@ -114,6 +121,13 @@ export function stepRide(b, keys, trail, treeBuckets, timing, dt) {
   return events;
 }
 
+// Pumping: compressing down the back of a roller pushes the bike on; up the face it costs a
+// little. Only rollers count, so holding Space up a jump's kicker to pop costs nothing.
+function pump(b, trail, s) {
+  const slope = trail.rollerSlope(s) * Math.cos(b.h - trail.headingAt(s)); // rise per metre, the way the bike goes
+  return (slope < 0 ? PUMP_GAIN * -slope : -PUMP_COST * slope) * G * b.compress;
+}
+
 // Forward acceleration from slope, pedalling, braking, rolling resistance and drag.
 function alongTrackAccel(b, keys, trail, s, off) {
   const { groundAt } = trail;
@@ -124,6 +138,7 @@ function alongTrackAccel(b, keys, trail, s, off) {
   let a = -G * slope / Math.sqrt(1 + slope * slope);
   if (keys.pedal) a += 3.0 * clamp((13 - b.v) / 5, 0, 1); // pedalling fades out between 8 and 13 m/s
   if (keys.brake && b.v > 0.1) a -= 8;
+  if (keys.hop && b.compress > 0) a += pump(b, trail, s);
   const offTrail = !trail.onTrail(s, off, b.x, b.z);
   a -= (offTrail ? 1.8 : 0.12) + 0.0045 * b.v * b.v;
   return a;
@@ -279,7 +294,7 @@ function flyOrFollowGround(b, trail, gNew, slopeNew, dt, events) {
     // A berm holding the bike presses it into the wall: swinging round to run along the berm
     // (the ground stops rising under it) mustn't throw it into the air.
     if (!b.pressed && followVy < b.vy - G * dt - TAKEOFF_MARGIN / dt && followVy < -1.5) {
-      b.fromLip = !!trail.kickerAt(b.s - 1.5); b.popped = false;
+      b.fromLip = !!trail.popAt(b.s - 1.5); b.popped = false; // just left a lip or a roller's crest
       b.air = true; b.airT = 0; b.vy -= G_AIR * dt; b.y += b.vy * dt;
     } else { b.vy = followVy; b.y = gNew; }
     return null;
@@ -313,12 +328,13 @@ function flyOrFollowGround(b, trail, gNew, slopeNew, dt, events) {
 function hopAndPop(b, trail, keys, dt, toast) {
   if (keys.hop && !b.air) { b.compress = Math.min(1, b.compress + dt * 4); return; }
   if (keys.hop || b.compress <= 0) return;
-  // Pop: release in the last 4 m of a kicker, or within 0.15 s of leaving the lip, for a big lift.
-  const k = trail.kickerAt(b.s), c = b.compress;
+  // Pop: release in the last 4 m of a kicker (or the way up to a roller's crest), or within
+  // 0.15 s of leaving the lip, for a big lift.
+  const k = trail.popAt(b.s), c = b.compress;
   const popToast = () => toast(c > 0.8 ? 'Big pop!' : 'Pop (hold Space longer for more)');
   if (!b.air && k && k.u > -4) { b.vy += 1.0 + 2.0 * c; b.air = true; b.airT = 0; b.y += 0.02; b.popped = true; popToast(); }
   else if (b.air && b.airT < 0.15 && b.fromLip && !b.popped) { b.vy += (1.0 + 2.0 * c) * 0.85; b.popped = true; popToast(); }
-  else if (!b.air && c > 0.3) { b.vy += 1.6 + 2.2 * c; b.air = true; b.airT = 0; b.y += 0.02; } // plain hop
+  else if (!b.air && c > 0.3 && !trail.onRollers(b.s)) { b.vy += 1.6 + 2.2 * c; b.air = true; b.airT = 0; b.y += 0.02; } // plain hop (not mid-pump on rollers)
   b.compress = 0;
 }
 
