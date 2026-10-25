@@ -3,6 +3,7 @@
 // buildForest() turns that into meshes. Everything is grouped into 100 m chunks
 // so only the forest near the rider is drawn.
 import * as THREE from './three.js';
+import { paintedTexture } from './texture.js';
 import { pickFrom, makeRandom } from './util.js';
 
 export const CHUNK_LENGTH = 100;
@@ -170,7 +171,7 @@ function barkTexture() {
     g.fillStyle = pickFrom(random, ['#8a7358', '#9b8466', '#76634c']);
     g.fillRect(random() * 64, 180 + random() * 60, 2 + random() * 5, 20 + random() * 50);
   }
-  const texture = new THREE.CanvasTexture(canvas);
+  const texture = paintedTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(2, 1);
   return texture;

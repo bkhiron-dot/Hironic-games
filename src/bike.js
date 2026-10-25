@@ -2,6 +2,7 @@
 // knobbly tyres and wheels that turn as you roll. The frame, cranks and rider sit on a sprung
 // "chassis" group that moves down when the suspension compresses; the wheels don't.
 import * as THREE from './three.js';
+import { paintedTexture } from './texture.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -155,7 +156,7 @@ function plateTexture() {
   g.fillStyle = '#e0672f'; g.fillRect(0, 0, 128, 22);
   g.fillStyle = '#141414'; g.font = 'bold 84px "Arial Narrow", Arial, sans-serif';
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('3', 64, 76);
-  return new THREE.CanvasTexture(canvas);
+  return paintedTexture(canvas);
 }
 
 /* ---------- Bike ---------- */

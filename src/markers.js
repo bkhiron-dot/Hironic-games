@@ -1,6 +1,7 @@
 // Things standing beside the trail: start, split and finish gates, landing flags,
 // the warning signs before big jumps, and the trailhead's fence, closed gates and map.
 import * as THREE from './three.js';
+import { paintedTexture } from './texture.js';
 
 const ORANGE = 0xe0672f;
 
@@ -16,7 +17,7 @@ function bannerTexture(text, background, foreground) {
   let size = 54;
   do g.font = `bold ${size}px "Arial Narrow", Arial, sans-serif`; while (g.measureText(text).width > 480 && (size -= 2) > 20);
   g.fillText(text, 256, 52);
-  return new THREE.CanvasTexture(canvas);
+  return paintedTexture(canvas);
 }
 
 // Trail heading at s, as a y rotation, so gates and flags face up the trail.
@@ -99,7 +100,7 @@ function markerPosts(scene, trail) {
     g.fillStyle = '#f3f1ea'; g.fillRect(0, 64, 64, 32);
     g.fillStyle = '#1a0d06'; g.font = 'bold 26px Arial, sans-serif'; g.textAlign = 'center';
     g.fillText(`${s} m`, 32, 90);
-    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.3), new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide }));
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.3), new THREE.MeshLambertMaterial({ map: paintedTexture(canvas), side: THREE.DoubleSide }));
     putAt(plate, trail, at, off, 0.85);
     plate.rotation.y = facing(trail, at);
     plate.translateZ(0.07);
@@ -135,7 +136,7 @@ function tapeTexture() {
     g.moveTo(x, 16); g.lineTo(x + 16, 0); g.lineTo(x + 32, 0); g.lineTo(x + 16, 16); g.fill();
   }
   g.globalCompositeOperation = 'destination-over'; g.fillStyle = '#f3f1ea'; g.fillRect(0, 0, 256, 16);
-  const texture = new THREE.CanvasTexture(canvas);
+  const texture = paintedTexture(canvas);
   texture.wrapS = THREE.RepeatWrapping;
   return texture;
 }
@@ -174,7 +175,7 @@ function mapTexture(trail) {
     g.font = '17px Arial, sans-serif';
     g.fillText(gt.open ? `${(trail.length / 1000).toFixed(1)} km, ${trail.jumps.length} jumps` : 'coming soon', x + 21, 492);
   });
-  return new THREE.CanvasTexture(canvas);
+  return paintedTexture(canvas);
 }
 
 function buildTrailhead(scene, trail) {
