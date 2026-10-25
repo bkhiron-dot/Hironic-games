@@ -10,6 +10,7 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 - Flag any assumption or approximation clearly and agree it before building on it.
 - Prefer small, reviewable commits. Run `npm test` before every commit.
 - When changing physics or a jump, re-run the jump simulator and report the new landing ranges as a table (speed at lip -> smooth / heavy / small crash / big crash).
+- **Branches** (Ben, 25 Oct): `main` is the live game the boys play; don't change it without Ben saying so. Work PRs target **`next`**. When there's something to play-test, open a release PR `next` -> `main` with the `preview` label, so Ben can try it at `preview/pr-<number>/`. Merging that release PR is Ben's call; it publishes to the live game.
 - **Previews** (Ben, 24 Oct): not on every PR. Add the `preview` label only when Ben asks, and suggest it when a change is significant or risky (physics or jump changes, new trails or features, big visual changes, anything that could hurt phone frame rate).
 
 ## Commands
@@ -72,6 +73,7 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 | Yaw rate | g tan(lean) / v, clamped +/-2.6 rad/s | below 3 m/s: steerIn x 2.0 |
 | Tyre grip | mu 0.75 on trail, 0.5 off trail | |
 | Berm support | aMax = g (mu + tan b) / (1 - mu tan b) | tan b = ground rise toward outside of turn over 1 m |
+| Berm shape (Flow Monster, step 3b) | 2.2 m high (was 1.7); start on bends tighter than 125 m radius, full height under 63 m (was 100 / 50 m) | capped at 0.85 x half width, so the narrowest bends (half width 2.3 m) get about 2.0 m. Berms on 438 m of trail (was 363). Steepest step 0.80 m per 0.5 m; cliff limit on berms 0.85 (was 0.8). Drifting wide into berms (96 test runs): 68 berm hits (was 59), off the trail 3 (was 14) |
 | Drift | sideways slip += excess x 0.55 dt, scrub excess x 0.22 dt | |
 | Berm catch | on berm (tan b > 0.25) after a slide: slip decays x exp(-9 dt), extra g x min(0.6, 0.8 tan b) turning, speed refund |
 | Berm hit | first contact with a berm after a slide harder than 0.3 (slide peak x fading memory, or slip / 1.5 m/s): bike swings 60% of the way to the trail's heading (only round the corner), sideways speed added to forward speed (v = sqrt(v^2 + slip^2)), slip x 0.2 | step 3, Ben's request. Speed kept (-0.03 to +0.27 km/h at the hit); drifting wide into berms ran off the trail in 2 of 48 test runs, was 9 | |
@@ -109,6 +111,7 @@ Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diago
 - **The trailhead clearing is cut into a valley**: the trail runs between banks that rise up to 20 m within 25 m of it, so a level 50 x 36 m pad with a smooth blend made cliffs (1.5 m per 0.5 m). The ground round it is graded instead: it may rise above or fall below the pad no faster than 0.7 (35 degrees, easing in over 6 m), and is the plain hill wherever that's gentler. Steepest step round it: 0.35 m per 0.5 m (limit 0.5). Past the gate the trail itself is untouched from 2 m on.
 - **Deploy concurrency is per job, not per workflow.** With one workflow-level group, the "pull request closed" run (skipped, no preview label) cancelled the publish of PR #11's merge, so main didn't go live. A skipped job never joins a job-level group.
 - Anything drawn on the ground (tyre tracks) must also wind its triangles to face up, or it is culled and invisible.
+- **Start a test bike already following the slope.** `placeBikeAt` sets no vertical speed; dropped in at speed on a -0.28 slope it flies about 12 m and bottoms out. Set `b.vy` from the slope ahead, as `tools/jump-sim.js` does. (Early berm-hit numbers in PR #10 were measured without this; re-measured in 3b.)
 - Every plant kind added to the forest must be listed in the ground test's "nothing grows on the trail" check, with its gap.
 - Plant triangle budget: about 525k across 16 chunks, about 100k drawn at once (tree-fern crowns 112 each, ground ferns 42). Check phones before adding more.
 - The game must keep working at phone width with touch controls; no `alert`/`prompt`; text input must not trigger game keys.
@@ -122,7 +125,7 @@ Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diago
    - **2b** (done): `s` follows the winding path. The trail keeps v1's shape on the hill (1297 m to ride). World-space hill with jump terraces; detailed ground strip plus hillside grid; forest regrown along the path. v1 step-for-step tests retired; replaced by ground tests (v1 riding line away from jumps, no cliffs, no trees on the trail) and game-physics ride tests (every jump, and a full run).
    - **Tuning round** (done): PR 1 fixed 1/240 s physics step. PR 2: the simulator uses the game's own physics; normal jumps re-baselined as measured; pop-optional gap 9 -> 8.5 m to restore its ranges. Rounds 3-4 (done): last jump rebuilt for a fast pop after Ben's playtests (lip 66 km/h with a pop: smooth).
 3. **Trailhead** (this step): the trail is renamed Flow Monster (blue). Level fenced clearing at the top; three gates, only blue open (green and black taped off, "coming soon"); map board drawn from the trail data. Drop in at rest in the clearing; the clock starts at the blue gate. End screen: **Ride again** (from the gate) or **Trailhead**. The game is the home page. One trail at a time (layout B, agreed).
-   - **3b**: Flow Monster's berms higher and steeper, jumps unchanged (numbers to agree with Ben first).
+   - **3b** (this step): Flow Monster's berms higher (2.2 m) and on more corners (option B), capped by trail width; jumps unchanged.
 4. **Jolly Green Giant** (green): chill, optional jump rollers, progressing to moderate jumps by the bottom (like Flow Monster's first jumps); pump mechanic (kept, see spec).
 5. **Back in Black** (black): all mandatory gaps: a range of gaps, step-downs and step-ups. No B lines. New jump kinds declare landing ranges checked against reachable lip speeds.
 6. **Scores**: top 10 per trail per split, with trail tabs, fresh start (no v1 scores carried over). (Trail ids changed in step 3: `hardline` became `flow-monster`, so any v2 scores already saved on a device no longer show.)

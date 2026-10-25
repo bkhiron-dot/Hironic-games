@@ -25,7 +25,9 @@ export default {
   hill: { grade: -0.2, waves: [{ amp: -7, period: 110 }], chutes: [{ from: 500, to: 580, grade: -0.12 }] },
   // Berms build themselves on corners, from gentle (startCurvature) to full height (fullCurvature).
   // To change one stretch, add e.g. adjust: [{ from: 650, to: 710, height: 2.2 }] (height 0 removes it).
-  berms: { auto: true, startCurvature: 0.010, fullCurvature: 0.020, height: 1.7, adjust: [] },
+  // Step 3b (Ben, option B): higher berms (2.2 m, was 1.7) on more corners: they start on bends
+  // tighter than 125 m radius and are full height under 63 m (was 100 m and 50 m).
+  berms: { auto: true, startCurvature: 0.008, fullCurvature: 0.016, height: 2.2, adjust: [] },
 
   start: { spawn: 2, gate: 9 },    // where the bike waits, and the timing gate
   splits: [326, 650, 974, 1297],   // the last one is the finish

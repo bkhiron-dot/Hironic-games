@@ -56,9 +56,10 @@ test('the trail is its full width square to the path, on bends too', () => {
 });
 
 // Largest height change between neighbouring points 0.5 m apart, over a world square, as a
-// share of what is allowed there: berm walls rise up to 1.7 m across a 2.3 m half width
-// (v1's steepest, about 0.74 m per 0.5 m), so on the trail and berms 0.8 m is allowed,
-// and 0.5 m everywhere else. A result above 1 is a cliff.
+// share of what is allowed there: berm walls rise up to 2.2 m across a 2.3 m half width
+// (step 3b, agreed with Ben; capped at 0.85 x half width: about 0.80 m per 0.5 m at the steepest), so on the trail and
+// berms 0.85 m is allowed (was 0.8 for v1's 1.7 m berms), and 0.5 m everywhere else.
+// A result above 1 is a cliff.
 function steepestStep(cx0, cz0, half) {
   let worst = { step: 0 };
   const STEP = 0.5, n = Math.round(2 * half / STEP);
@@ -70,7 +71,7 @@ function steepestStep(cx0, cz0, half) {
       row[c] = T.groundAt(x, z);
       // jump lips and holes are steep on purpose, right across the trail and its banks
       skip[c] = onJump(at.s, 2) && Math.abs(at.off) < T.halfWidth(at.s) + 21 ? 1 : 0;
-      const allowed = Math.abs(at.off) < T.halfWidth(at.s) + 2.5 ? 0.8 : 0.5;
+      const allowed = Math.abs(at.off) < T.halfWidth(at.s) + 2.5 ? 0.85 : 0.5;
       const check = (h, where) => { const step = Math.abs(row[c] - h) / allowed; if (step > worst.step) worst = { step, x, z, where }; };
       if (c > 0 && !skip[c] && !skip[c - 1]) check(row[c - 1], 'across');
       if (prevRow && !skip[c] && !prevRow.skip[c]) check(prevRow.h[c], 'down');

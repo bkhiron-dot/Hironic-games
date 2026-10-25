@@ -29,6 +29,8 @@ export const NEAR_REACH = BLEND_END + 6; // how far past the edge the detailed g
 const BERM_FADE_BEFORE_JUMP = 20; // berms fade out from this far before a kicker (m)...
 const BERM_FADE_LENGTH = 8;       // ...over this distance, and back in after the landing
 const BERM_ADJUST_FADE = 5;       // a berm adjustment blends in and out over this distance (m)
+const BERM_MAX_PER_WIDTH = 0.85;  // a berm wall is at most 0.85 x the half width high, so on narrow
+                                  // sections it is never steeper than about 0.85 m per 0.5 m at the edge
 const PATH_MARGIN = 120;          // the path is measured this far beyond each end (m)
 
 const waveList = list => (list || []).map(w => ({ amp: w.amp, period: w.period, phase: w.phase || 0 }));
@@ -106,7 +108,7 @@ export function defineTrail(data) {
       const t = smoothstep((s - a.from + BERM_ADJUST_FADE) / BERM_ADJUST_FADE) * smoothstep((a.to + BERM_ADJUST_FADE - s) / BERM_ADJUST_FADE);
       h += (a.height - h) * t;
     }
-    return h;
+    return Math.min(h, BERM_MAX_PER_WIDTH * halfWidth(s));
   }
 
   /* Berms: on tight corners the outside of the trail curves up like a wall. They are built
