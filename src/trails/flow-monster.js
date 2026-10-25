@@ -35,15 +35,17 @@ export default {
   features: [
     { type: 'jump', at: 177, kind: 'normal' },
     { type: 'jump', at: 438, kind: 'popOptional' },
-    // Landing 10% longer (33 m, was 30) after Ben overshot it twice: smooth up to 70 km/h
-    // without a pop (was 68). Flags moved out to match where the game's landings touch down.
-    { type: 'jump', at: 743, kind: 'normal', land: 33, sweet1: 21, long: 25,
+    // Ben kept overshooting this one even without a pop. A longer landing alone didn't help (the
+    // landing's slope stays the same), so the kicker is longer and gentler (12 m, was 9; same 1.1 m
+    // lip): you fly flatter and come down in line with the landing. Landing 37 m (was 33, at first 30).
+    // Smooth from 52 to 80 km/h without a pop (was 46-70); you reach this lip at up to about 77.
+    // Flags moved to where the game's landings touch down.
+    { type: 'jump', at: 743, kind: 'normal', kick: 12, land: 37, sweet1: 22, long: 26.5,
       landings: [
-        { pop: 0, from: 46, to: 70, outcome: 'smooth' },
-        { pop: 3, from: 34, to: 52, outcome: 'smooth' },
-        { pop: 0, from: 36, to: 36, outcome: 'big crash' },   // far too slow: cased
-        { pop: 0, from: 78, to: 78, outcome: 'small crash' }, // too fast: flat landing...
-        { pop: 0, from: 80, to: 84, outcome: 'big crash' },   // ...and faster still
+        { pop: 0, from: 52, to: 80, outcome: 'smooth' },
+        { pop: 3, from: 36, to: 60, outcome: 'smooth' },
+        { pop: 0, from: 40, to: 44, outcome: 'big crash' },   // far too slow: cased
+        { pop: 0, from: 88, to: 88, outcome: 'small crash' }, // too fast: flat landing
       ] },
     { type: 'jump', at: 1037, kind: 'bigPop' },
   ],
