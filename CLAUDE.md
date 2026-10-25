@@ -30,14 +30,15 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 - `src/texture.js` - `paintedTexture(canvas)`: every texture painted on a canvas goes through it (see gotchas).
 - `src/path.js` - the centreline as a measured path: distance along it, points square to it, and `locate(x, z)` to find any world point on it.
 - `src/clock.js` - fixed-step physics clock (1/240 s steps, at most 0.1 s of catch-up per frame).
-- `src/jumps.js` - jump kinds (shape, landing flags, declared landing ranges). Trails place jumps by kind and may override numbers.
-- `src/trailhead.js` - `withTrailhead(trail)`: the level, fenced clearing above the trail's start gate, three start gates (green, blue, black; only the ridden trail's is open), the drop-in point, and the ground graded into the hill round it. `main.js` wraps the trail with it.
+- `src/jumps.js` - jump kinds (shape, landing flags, declared landing ranges). Trails place jumps by kind and may override numbers. Kinds: `normal`, `popOptional`, `bigPop`, `table` (tabletop: flat deck at lip height, long steep landing).
+- `src/rollers.js` - roller sets (`type: 'rollers'` features): `count` humps, `height`, `spacing` crest to crest, `face` (share of each hump that is its way up). Each set declares its outcomes (rolled / gapped / no crash).
+- `src/trailhead.js` - `withTrailhead(trail, built)`: the level, fenced clearing above the trail's start gate, three start gates (green, blue, black), the drop-in point, and the ground graded into the hill round it. The ridden trail's gate is open, and so is every other built trail's (`built`: their difficulties): riding out through one switches trail. `main.js` picks the trail from `?trail=<id>` (Flow Monster by default) and wraps it; a switch fades out, saves the speed in sessionStorage and reloads into the other trail's world, carrying on from just above its gate (`atGate`).
 - `public/v2.html` - redirect from the old v2 address to the home page.
 - `src/dirt.js` - dirt thrown up by the tyres (crumbs when rolling, roost and dust growing with drift, an explosion on a berm hit, puffs on landings). `src/tracks.js` - tyre tracks in the dirt. Both visual only.
 - Adding `?debug` to the address exposes the game state as `window.hardline` for test tools (screenshots, tuning).
 - `.github/workflows/deploy-pages.yml` + `tools/build-site.sh` - publish to GitHub Pages: main at the root on every push; an open pull request labelled `preview` also at `preview/pr-<number>/`, rebuilt on each push while labelled, link posted on the PR. Label removed or PR closed: the preview goes at the next publish. Previews never block main (a broken one is skipped).
-- `tools/jump-sim.js` - jump simulator: rides a jump with the game's own physics (`stepRide`, 1/240 s steps) on a straight test trail at -0.2 grade, or on a real trail (`rideJump`). `npm run jumps` prints every jump on every trail.
-- `tests/` - `node:test` tests. `ground.test.js` checks Flow Monster against v1's own code (read out of `public/v1.html`) away from jumps, and that the ground has no cliffs. `ride.test.js` rides the game's physics over every jump and the whole trail (`tests/helpers/ride.js`). `berm.test.js` checks berm hits. `trailhead.test.js` checks the clearing (level, no cliffs, gates and fence, forest unmoved) and a run from the drop-in to the finish.
+- `tools/jump-sim.js` - jump simulator: rides a jump with the game's own physics (`stepRide`, 1/240 s steps) on a straight test trail at the trail's own grade (-0.2 for jump kinds and Flow Monster), or on a real trail (`rideJump`); `rideRollers` rides a roller set (rolled, or a full pop at the first crest). `npm run jumps` prints every jump and roller set on every trail.
+- `tests/` - `node:test` tests. `ground.test.js` checks Flow Monster against v1's own code (read out of `public/v1.html`) away from jumps, and that the ground has no cliffs. `ride.test.js` rides the game's physics over every jump and the whole trail (`tests/helpers/ride.js`). `berm.test.js` checks berm hits. `trailhead.test.js` checks the clearing (level, no cliffs, gates and fence, switching gates, forest unmoved) and a run from the drop-in to the finish. `green.test.js` checks Jolly Green Giant: every roller set's outcomes, pumping vs pedalling, no cliffs, berms on corners, nothing on the trail, and slow and fast runs from the trailhead. `tests/helpers/ride.js` rides any trail (`rideTrail({ trail, lipPlan, cruise, pump })`).
 - `docs/v2-trailhead-spec.md` - the agreed design for the trailhead and the three trails.
 
 ## v1 state (what already works)
@@ -58,6 +59,7 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 - The centreline is laid out as sideways sine waves of `d`; `src/path.js` measures it. World point for (s, off): `trail.pointAt(s, off)`; height: `trail.ground(s, off)` or `trail.groundAt(x, z)`; back again: `trail.locate(x, z)`. Rider travels toward -z.
 - The hill is a function of world position (`d`) with each jump's drop built in as a terrace. Near the trail the ground is the riding line + dish + berms + banks; from 6 m past the edge it blends into the hill by 20 m, so tight bends can't make cliffs. Bends tighter than about 35 m radius are refused (the detailed ground would fold).
 - Heading `h`: forward vector `(sin h, 0, -cos h)`; right vector `(cos h, 0, sin h)`. Bike `rotation.y = -h`, rotation order `YXZ`.
+- Jolly Green Giant (`src/trails/jolly-green-giant.js`, green, step 4): 1100 m to ride, 1026 m straight down; half width 4.5-5.5 m; grade -0.10 with a 4 m wave; bends no tighter than 44 m radius, 1.8 m berms from 170 m radius (full under 70 m). 7 roller sets (4 pump sets 0.6 m high, 10 m apart; 3 gap sets 0.5-0.55 m, 6.5 m apart) and 5 tabletops; splits at 275, 550, 825, finish 1100 m.
 - Flow Monster (`src/trails/flow-monster.js`, blue; was "Hardline" until step 3): centreline `x = 22 sin(d/45) + 8 sin(d/23 + 1)`, the same shape on the hill as v1; 1200 m straight down, 1297 m to ride. Hill grade -0.2 (11 degrees) with a 7 m sine undulation and a steeper chute 500-580 m down. Jumps at 177, 438, 743, 1037 m; splits at 326, 650, 974, finish 1297 m.
 
 ## Tuned physics (keep these unless Ben agrees a change)
@@ -89,7 +91,8 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 | Suspension travel | 0.55 m (0.40 m if crouched) | |
 | Landing decel | 38 m/s^2 | travel used = vi^2 / (2 x 38) / travel |
 | Landing outcome | < 0.55 smooth, < 1.0 heavy, < 1.35 small crash, else big crash | lean over 0.4 rad adds penalty |
-| Pop | +1.0 + 2.0 x compress (upward m/s) | release in last 4 m of kicker or within 0.15 s of leaving lip |
+| Pop | +1.0 + 2.0 x compress (upward m/s) | release in last 4 m of kicker or within 0.15 s of leaving lip. On rollers only right at a crest: 1 m before it to 0.5 m after (checked after the step's move, so a release on the last step before the crest lands just past it) |
+| Pump (rollers only) | holding compress down the back of a roller: + 2.5 x g x back slope; up the face: - 0.5 x g x face slope. On a roller set, letting go away from a crest is the pump extending (no hop) | Agreed start was 0.35 g x slope, half on the face: added 1.5-2.5 km/h per set, far short of the target. Now pumping a set matches pedalling at 20-30 km/h and beats it from 40 (pedalling fades): from 30 km/h coast +3 to +10, pump +14 to +21, pedal +14 to +18 km/h over a set. Face cost 1.25 stalled a slow rider holding Space (15 km/h); 0.5 doesn't. Only rollers count, so Flow Monster is unchanged |
 | Tree crash | small below 9 m/s (32 km/h), big at or above | below 2.5 m/s you just stop |
 | Visual suspension spring | k 170, c 18, 0.18 m max | |
 
@@ -101,6 +104,21 @@ Jump shapes and their declared landing ranges live in `src/jumps.js` and are che
 | Normal, stretched (743 m) | 74-90 no pop, 54-78 pop | Ben reaches it at 72-78 km/h and pops it; it overshot at landing 30, 33 and (kicker 12 m) 37 m. Kicker 14 m, gap 9.5 m, landing 44 m. No pop: heavy 68-72, small crash 66, cased below 66. Pop: heavy 50-52 and 80-86 |
 | Big, pop optional, stretched (438 m) | 56-74 no pop, 46-62 pop | Ben overshot it with a pop (lip about 56-61 km/h). Kicker 14 m (was 10), lip 1.5 m, gap 8 m (was 8.5), landing 50 m (was 42). No pop touches down at the top of the landing (8-12 m past the lip), a pop at Ben's speeds deep in it (15-22 m; sweet spot ends 23.5 m). No pop: heavy 54 and 76, small crash 52, cased below 52. Pop: heavy 40-44 and 64-66, small crash 68-70, big crash from 72 |
 | Big, needs pop, kind `bigPop` (1037 m) | 54-66 pop; no pop cases | Shaped with Ben (tuning rounds 2-4): kicker 12 m, lip 1.8 m, gap 12 m, knuckle 2.4 m, landing 48 m at pitch 0.7. Sweet spot 12.3-30.1 m past the lip. Round 3's 2.2 m lip overshot with a pop at speed; this one is built for a fast pop (lip reachable at about 62 on Flow Monster) |
+
+Jolly Green Giant (grade -0.10; simulator on that grade). Every tabletop can be rolled or landed smooth without a pop at any speed tested; coming up short lands on the deck:
+
+| Tabletop | Shape | No pop | Full pop | Flat out (pumping too) |
+|---|---|---|---|---|
+| 288, 419 m | kicker 8, lip 0.9, deck 4.5, landing 24 at 0.42 | clean 14-62 | smooth 14-42 and 46-52, heavy 44 and 54-56, big crash from 58 | 44, 45 (44, 50) |
+| 635 m | kicker 10, lip 1.1, deck 6, landing 26 at 0.44 | clean 14-68 | smooth 34-52, no crash to 54 | 45 (47) |
+| 764, 976 m | kicker 12, lip 1.0, deck 7.5, landing 32 at 0.45 | clean 14-70 | smooth 40-64, big crash from 66 | 55, 51 (58, 53) |
+
+| Roller set | Rolled | Full pop at a crest |
+|---|---|---|
+| Pump sets (40, 361, 683, 1020 m): 0.6 m, 10 m apart | smooth 15-65 | lands on the next face: smooth to 30, heavy 35-40, small crash from 45 |
+| Gap sets (166, 514, 864 m): 0.5-0.55 m, 6.5 m apart, face 0.6 | smooth 15-65 | gapped (lands on the next crest's top or beyond) and smooth 55-65; below that heavy, no crash |
+
+Findings: with 1.5 g in the air and a 3 m/s pop, a crest-to-crest flight lasts about 0.4 s, so rollers 10 m apart can't be gapped at reachable speeds (6.5 m can). A pop at 50 km/h comes down at about -0.45, so a tabletop landing must be that steep and long enough (the smooth part of a landing is its steep middle, 20-50%). Height-neutral tabletops (short landing back onto the trail grade) crashed popped riders from 38 km/h.
 
 Fastest reachable lip speed on Flow Monster (flat out from the trailhead drop-in, pedalling all the way, scripted rider): 177 m about 68, 438 m about 55-59 (kicker 14 m), 743 m about 74-78, 1037 m about 64-66 km/h. So the "pop optional" jump lands without a pop at 52-56 km/h on Flow Monster. These are conservative: Ben has reached the last lip at 66 km/h (scripted rider about 61-63), so leave headroom above them when shaping a jump.
 
@@ -120,6 +138,7 @@ Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diago
 - **The trailhead clearing is cut into a valley**: the trail runs between banks that rise up to 20 m within 25 m of it, so a level 50 x 36 m pad with a smooth blend made cliffs (1.5 m per 0.5 m). The ground round it is graded instead: it may rise above or fall below the pad no faster than 0.7 (35 degrees, easing in over 6 m), and is the plain hill wherever that's gentler. Steepest step round it: 0.35 m per 0.5 m (limit 0.5). Past the gate the trail itself is untouched from 2 m on.
 - **Deploy concurrency is per job, not per workflow.** With one workflow-level group, the "pull request closed" run (skipped, no preview label) cancelled the publish of PR #11's merge, so main didn't go live. A skipped job never joins a job-level group. Merging a labelled release PR still raced: its "closed" run (a real build) cancelled the push-to-main publish in the same second (#14, #22; the closed run happened to publish main anyway). So a release merged into main skips the closed run; the push publishes.
 - **Painted textures must not be `THREE.CanvasTexture`** (25 Oct): on Ben's phone the live game drew the dirt, trunks and fence tape black. A phone drops the WebGL context on a tab or app switch and can wipe hidden canvases; on restore Three.js re-uploads from the canvas, so a wiped one is black. `paintedTexture()` keeps a copy of the pixels.
+- **`main.js` ends with `run.resetRun()`** (the start screen's view, at the drop-in). Anything that starts a run on load (arriving through a gate from another trail) must come after it, or it's reset straight back to the drop-in.
 - Anything drawn on the ground (tyre tracks) must also wind its triangles to face up, or it is culled and invisible.
 - **Start a test bike already following the slope.** `placeBikeAt` sets no vertical speed; dropped in at speed on a -0.28 slope it flies about 12 m and bottoms out. Set `b.vy` from the slope ahead, as `tools/jump-sim.js` does. (Early berm-hit numbers in PR #10 were measured without this; re-measured in 3b.)
 - Every plant kind added to the forest must be listed in the ground test's "nothing grows on the trail" check, with its gap.
@@ -136,7 +155,7 @@ Fixed in 2b: in v1 `s` ran straight down the hill, so the first jump (on a diago
    - **Tuning round** (done): PR 1 fixed 1/240 s physics step. PR 2: the simulator uses the game's own physics; normal jumps re-baselined as measured; pop-optional gap 9 -> 8.5 m to restore its ranges. Rounds 3-4 (done): last jump rebuilt for a fast pop after Ben's playtests (lip 66 km/h with a pop: smooth).
 3. **Trailhead** (this step): the trail is renamed Flow Monster (blue). Level fenced clearing at the top; three gates, only blue open (green and black taped off, "coming soon"); map board drawn from the trail data. Drop in at rest in the clearing; the clock starts at the blue gate. End screen: **Ride again** (from the gate) or **Trailhead**. The game is the home page. One trail at a time (layout B, agreed).
    - **3b** (this step): Flow Monster's berms higher (2.2 m) and on more corners (option B), capped by trail width; jumps unchanged.
-4. **Jolly Green Giant** (green): chill, optional jump rollers, progressing to moderate jumps by the bottom (like Flow Monster's first jumps); pump mechanic (kept, see spec).
+4. **Jolly Green Giant** (green, done in next 2.0): wide and gentle; pump rollers and gap sets; five tabletops growing toward the bottom; pump mechanic; ride through a gate to switch trails.
 5. **Back in Black** (black): all mandatory gaps: a range of gaps, step-downs and step-ups. No B lines. New jump kinds declare landing ranges checked against reachable lip speeds.
 6. **Scores**: top 10 per trail per split, with trail tabs, fresh start (no v1 scores carried over). (Trail ids changed in step 3: `hardline` became `flow-monster`, so any v2 scores already saved on a device no longer show.)
 7. **Hosting** (done for the game: GitHub Pages on every push to main); then consider a shared score backend.

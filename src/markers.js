@@ -112,7 +112,7 @@ export function buildMarkers(scene, trail) {
   markerPosts(scene, trail);
   if (trail.trailhead) {
     // the trail's own gate in the clearing carries its name in its colour
-    const own = trail.trailhead.gates.find(g => g.open);
+    const own = trail.trailhead.gates.find(g => g.ridden);
     gate(scene, trail, trail.start.gate, own.name.toUpperCase(), own.colour, '#f3f1ea');
     buildTrailhead(scene, trail);
   } else gate(scene, trail, trail.start.gate, 'START', '#1d2e1f', '#f3f1ea');
@@ -141,7 +141,7 @@ function tapeTexture() {
   return texture;
 }
 
-// The map board: every trail's line drawn from its data (only the open one so far).
+// The map board: this trail's line drawn from its data, and a key to every gate.
 function mapTexture(trail) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 512;
@@ -156,13 +156,14 @@ function mapTexture(trail) {
   const minX = Math.min(...xs), maxX = Math.max(...xs), maxZ = Math.max(...zs), minZ = Math.min(...zs);
   const scale = Math.min(150 / (maxX - minX || 1), 360 / (maxZ - minZ));
   const toBoard = p => [256 + (p.x - (minX + maxX) / 2) * scale, 80 + (maxZ - p.z) * scale];
-  const own = trail.trailhead.gates.find(gt => gt.open);
+  const own = trail.trailhead.gates.find(gt => gt.ridden);
   g.strokeStyle = own.colour; g.lineWidth = 7; g.lineJoin = 'round'; g.beginPath();
   points.forEach((p, i) => { const [x, y] = toBoard(p); if (i) g.lineTo(x, y); else g.moveTo(x, y); });
   g.stroke();
   // jumps as orange marks, splits as dark dots
   g.fillStyle = ORANGE;
   for (const j of trail.jumps) { const [x, y] = toBoard(trail.pointAt(j.s)); g.fillRect(x - 9, y - 4, 18, 8); }
+  for (const r of trail.rollers) { const [x, y] = toBoard(trail.pointAt((r.s + r.end) / 2)); g.fillRect(x - 6, y - 2, 12, 4); }
   g.fillStyle = '#1d2e1f';
   for (const s of trail.splits) { const [x, y] = toBoard(trail.pointAt(s)); g.beginPath(); g.arc(x, y, 7, 0, 2 * Math.PI); g.fill(); }
   // the key: each gate, left to right as you face them
@@ -173,7 +174,8 @@ function mapTexture(trail) {
     g.fillStyle = '#1d2e1f'; g.font = 'bold 19px Arial, sans-serif';
     g.fillText(gt.name, x + 21, 467);
     g.font = '17px Arial, sans-serif';
-    g.fillText(gt.open ? `${(trail.length / 1000).toFixed(1)} km, ${trail.jumps.length} jumps` : 'coming soon', x + 21, 492);
+    const here = `${(trail.length / 1000).toFixed(1)} km, ${trail.jumps.length} jumps`;
+    g.fillText(gt.ridden ? here : gt.open ? 'ride through to switch' : 'coming soon', x + 21, 492);
   });
   return paintedTexture(canvas);
 }
@@ -211,10 +213,11 @@ function buildTrailhead(scene, trail) {
   dummy.scale.set(1, 1, 1);
   for (const m of [postMesh, railMesh]) { m.frustumCulled = false; m.castShadow = true; scene.add(m); }
 
-  // Closed gates: posts, a banner with the trail's name, tape across and a "coming soon" board.
+  // The other gates: posts and a banner with the trail's name. Closed ones (not built yet) also
+  // get tape across and a "coming soon" board; open ones lead to that trail.
   const tape = new THREE.MeshBasicMaterial({ map: tapeTexture(), side: THREE.DoubleSide });
   tape.map.repeat.set(th.opening * 2 / 2, 1);
-  for (const g of th.gates.filter(gt => !gt.open)) {
+  for (const g of th.gates.filter(gt => !gt.ridden)) {
     const postMaterial = new THREE.MeshLambertMaterial({ color: g.colour });
     for (const side of [-1, 1]) {
       scene.add(placed(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4.6, 8), postMaterial), at(0, g.v + side * th.opening, 2.3), facingUp));
@@ -222,6 +225,7 @@ function buildTrailhead(scene, trail) {
     const banner = new THREE.Mesh(new THREE.BoxGeometry(2 * th.opening, 0.8, 0.06),
       [postMaterial, postMaterial, postMaterial, postMaterial, new THREE.MeshBasicMaterial({ map: bannerTexture(g.name.toUpperCase(), g.colour, '#f3f1ea') }), postMaterial]);
     scene.add(placed(banner, at(0, g.v, 4.4), facingUp));
+    if (g.open) continue;
     for (const up of [0.7, 1.15]) scene.add(placed(new THREE.Mesh(new THREE.PlaneGeometry(2 * th.opening, 0.1), tape), at(0, g.v, up), facingUp));
     const board = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.6),
       new THREE.MeshBasicMaterial({ map: bannerTexture('COMING SOON', '#f2a531', '#1a0d06'), side: THREE.DoubleSide }));

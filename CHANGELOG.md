@@ -9,6 +9,12 @@ A refinement (a trail line, a jump, the physics) is a minor version: 1.1, 1.2 an
 
 ## next
 
+- **2.0**: Jolly Green Giant, the green trail.
+  - 1.1 km, wide and gentle.
+  - Pump rollers, gap sets you can pop, and five tabletops growing toward the bottom.
+  - Pump on rollers: hold Space down the backs.
+  - Ride out through another open gate at the trailhead to switch trail.
+  - The jump simulator rides each trail's jumps on that trail's grade.
 - **1.3**
   - Drift grows with speed and steering: none below 20 km/h, full from 50 km/h. It used to be strongest at low speed.
   - A rider gripping on a berm gets its full support, so a fast mid-line through a wide berm (like the final one) doesn't drift.

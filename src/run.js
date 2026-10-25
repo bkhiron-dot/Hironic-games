@@ -7,7 +7,8 @@ import { releaseAll } from './input.js';
 import { formatTime } from './hud.js';
 
 // effects: the dirt thrown up on berm hits and landings (visual only).
-export function createRun({ b, keys, trail, scene, chassis, rider, treeBuckets, hud, scores, chaseCamera, effects }) {
+// switchTrail(gate, speed): called when the rider leaves the clearing through another trail's gate.
+export function createRun({ b, keys, trail, scene, chassis, rider, treeBuckets, hud, scores, chaseCamera, effects, switchTrail }) {
   const { spawn, gate } = trail.start; // where the bike waits at the gate, and the timing gate
   const splitsAt = trail.splits, th = trail.trailhead; // th: the clearing at the top, if any
   let state = 'menu', runTime = 0, timing = false, nextSplit = 0, crashes = 0, splits = [];
@@ -21,18 +22,20 @@ export function createRun({ b, keys, trail, scene, chassis, rider, treeBuckets, 
     rider.rotation.set(0, 0, 0);
   }
 
-  // from: 'trailhead' (at rest at the back of the clearing) or 'gate' (just above the start gate).
-  function resetRun(from = 'trailhead') {
+  // from: 'trailhead' (at rest at the back of the clearing), 'gate' (just above the start gate),
+  // or 'switched' (just came through this trail's gate from another trail's world, at `speed`).
+  function resetRun(from = 'trailhead', speed = 0) {
     runTime = 0; timing = false; nextSplit = 0; crashes = 0; splits = [];
     remount();
     if (th && from === 'trailhead') placeBikeAtPoint(b, trail, th.dropIn.x, th.dropIn.z, th.dropIn.h, 0);
+    else if (th && from === 'switched') placeBikeAtPoint(b, trail, th.atGate.x, th.atGate.z, th.atGate.h, speed);
     else placeBikeAt(b, trail, spawn, 0);
     chaseCamera.snap(b);
     hud.resetSplit();
   }
 
-  function startRun(from = 'trailhead') {
-    resetRun(from);
+  function startRun(from = 'trailhead', speed = 0) {
+    resetRun(from, speed);
     state = 'ride';
     hud.hideScreens();
   }
@@ -40,7 +43,8 @@ export function createRun({ b, keys, trail, scene, chassis, rider, treeBuckets, 
   // The trailhead fence and the closed gates stop the bike where it touches them.
   function stopAtFence(x0, z0) {
     const hit = th && th.blocked(x0, z0, b.x, b.z);
-    if (!hit) { againstFence = false; return; }
+    if (hit && hit.switchTo && switchTrail) { state = 'switching'; switchTrail(hit.switchTo, b.v); return; }
+    if (!hit || hit.switchTo) { againstFence = false; return; }
     b.x = x0; b.z = z0; b.s = trail.locate(x0, z0).s; b.v = 0; b.slipV = 0;
     if (!againstFence) hud.toast(hit.gate ? hit.gate.name + ': coming soon' : 'Fence: head for the open gate');
     againstFence = true;
