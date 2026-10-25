@@ -56,22 +56,35 @@ test('a reshaped jump is accepted once it declares its own landing ranges', () =
 
 test('berm adjustments change only their stretch, blending in and out over 5 m', () => {
   const plain = defineTrail(flowMonster);
-  // find a stretch with a full berm, away from jumps
+  const H = flowMonster.berms.height, raise = H * 1.2;
+  // find a stretch with a full berm, away from jumps, wide enough that the width cap
+  // (berm at most 0.85 x half width) doesn't limit even the raised berm
+  const wide = s => { for (let u = s - 10; u <= s + 20; u++) if (0.85 * plain.halfWidth(u) < raise) return false; return true; };
   let at = 0;
-  for (let s = 20; s < 1180; s += 1) if (plain.bermAmount(s) > 1.6) { at = s; break; }
+  for (let s = 20; s < 1180; s += 1) if (plain.bermAmount(s) > 0.95 * H && wide(s)) { at = s; break; }
   assert.ok(at > 0, 'expected a full berm somewhere');
   const from = at + 3, to = at + 13; // starts just inside the full berm, so the blend-in is measurable
   const removed = defineTrail(variant({ berms: { ...flowMonster.berms, adjust: [{ from, to, height: 0 }] } }));
-  const raised = defineTrail(variant({ berms: { ...flowMonster.berms, adjust: [{ from, to, height: 2.2 }] } }));
+  const raised = defineTrail(variant({ berms: { ...flowMonster.berms, adjust: [{ from, to, height: raise }] } }));
   for (let s = from; s <= to; s += 0.5) {
     assert.equal(removed.bermAmount(s), 0, `no berm at ${s}`);
-    assert.ok(Math.abs(raised.bermAmount(s) - plain.bermAmount(s) * 2.2 / 1.7) < 1e-9, `taller berm at ${s}`);
+    assert.ok(Math.abs(raised.bermAmount(s) - plain.bermAmount(s) * raise / H) < 1e-9, `taller berm at ${s}`);
   }
   for (const s of [from - 5, from - 20, to + 5, to + 20]) assert.equal(removed.bermAmount(s), plain.bermAmount(s), `untouched at ${s}`);
   // halfway through the 5 m blend, half the berm is left
   const mid = from - 2.5;
-  assert.ok(plain.bermAmount(mid) > 1.5, 'blend point is on a full berm');
+  assert.ok(plain.bermAmount(mid) > 0.9 * H, 'blend point is on a full berm');
   assert.ok(Math.abs(removed.bermAmount(mid) - plain.bermAmount(mid) / 2) < 1e-9, 'blends in');
+});
+
+test('berm walls are at most 0.85 x the half width high, so narrow sections never get a cliff', () => {
+  const T = defineTrail(flowMonster);
+  let capped = 0;
+  for (let s = 0; s < T.length; s += 0.5) {
+    assert.ok(T.bermAmount(s) <= 0.85 * T.halfWidth(s) + 1e-9, `berm at ${s}`);
+    if (T.bermAmount(s) > 0.84 * T.halfWidth(s)) capped++;
+  }
+  assert.ok(capped > 0, 'the cap is in use on the narrowest bends');
 });
 
 test('berms can be switched off for a whole trail', () => {
