@@ -21,6 +21,11 @@ A refinement (a trail line, a jump, the physics) is a minor version: 1.1, 1.2 an
 
 ## main
 
+- **1.2** (release PR #24): next 1.2-1.3.
+  - Start screen with the name, the producer, the park and the version.
+  - Drift grows with speed (none below 20 km/h).
+  - A fast mid-line through a wide berm grips.
+  - A merged release no longer cancels its own publish.
 - **1.1**: fix for black dirt, trunks and fence tape on phones (next 1.1).
 - **1.0** (25 Oct, release PR #14): the first numbered release. Everything before it was unnumbered: the original v1, the modular rebuild, and the trailhead.
   - Flow Monster's berms are higher (2.2 m) and on more corners.
