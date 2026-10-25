@@ -58,7 +58,7 @@ const tracks = createTracks(scene, world);
 const b = createBikeState();
 const chaseCamera = createChaseCamera(camera, world, reduceMotion);
 const scores = createScoreStore(SCORES_KEY);
-const hud = createHud({ scores, trail, coarse });
+const hud = createHud({ scores, trail, trails: world.trails, coarse });
 
 let run = null;
 const keys = createInput({
