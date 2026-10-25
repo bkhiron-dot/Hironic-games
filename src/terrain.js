@@ -1,5 +1,6 @@
 // The terrain: the trail and the forest floor around it.
 import * as THREE from './three.js';
+import { paintedTexture } from './texture.js';
 import { makeRandom, makeGroundNoise } from './util.js';
 import { NEAR_REACH } from './trail.js';
 
@@ -161,7 +162,7 @@ function dirtTexture(renderer) {
     g.fillStyle = 'rgba(90,90,90,.45)';
     g.save(); g.translate(random() * 256, random() * 256); g.rotate(random() * 6); g.fillRect(-4, -1, 8, 2); g.restore();
   }
-  const texture = new THREE.CanvasTexture(canvas);
+  const texture = paintedTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   return texture;
