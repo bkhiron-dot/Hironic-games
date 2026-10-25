@@ -10,6 +10,7 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 - Flag any assumption or approximation clearly and agree it before building on it.
 - Prefer small, reviewable commits. Run `npm test` before every commit.
 - When changing physics or a jump, re-run the jump simulator and report the new landing ranges as a table (speed at lip -> smooth / heavy / small crash / big crash).
+- **Branches** (Ben, 25 Oct): `main` is the live game the boys play; don't change it without Ben saying so. Work PRs target **`next`**. When there's something to play-test, open a release PR `next` -> `main` with the `preview` label, so Ben can try it at `preview/pr-<number>/`. Merging that release PR is Ben's call; it publishes to the live game.
 - **Previews** (Ben, 24 Oct): not on every PR. Add the `preview` label only when Ben asks, and suggest it when a change is significant or risky (physics or jump changes, new trails or features, big visual changes, anything that could hurt phone frame rate).
 
 ## Commands
