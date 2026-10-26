@@ -12,8 +12,8 @@ A refinement (a trail line, a jump, the physics) is a minor version: 1.1, 1.2 an
 - **4.0**: one mountain with all three trails.
   - Riding through a gate is seamless, on every trail: no reload, no fade. The trail you ride out through is your run.
   - All three trails finish in a shared finish clearing at the bottom.
-  - Jolly Green Giant re-laid: 2.0 km of long traverses and switchbacks out to the west, about -0.14 overall. Rollers and four tabletops placed on the traverses.
-  - Back in Black re-laid: 1.23 km, nearly straight down to the east. Seven mandatory gaps (a drop, a step-down, three gaps, two step-ups).
+  - Jolly Green Giant re-laid: 2.1 km of long traverses and switchbacks out to the west, about -0.14 overall, with gentle bends and berms along the traverses. Big rollers (1.1-1.2 m high, double the old ones) for pumping, and four tabletops.
+  - Back in Black re-laid: 1.34 km, twisty: fast straights with a gap on each, joined by tight S-bends with 2 m berms. Six mandatory gaps (two gaps, a step-down, two step-ups, a drop).
   - Flow Monster is unchanged.
   - High scores have a section for each trail (green, blue, black), each with its splits and finish. The board opens on the trail you're riding.
   - The forest and the ground are drawn in pieces near the rider, so the phone draws about as much as before.

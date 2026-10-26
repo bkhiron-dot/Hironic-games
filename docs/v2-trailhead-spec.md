@@ -98,7 +98,7 @@ Agreed with Ben on 24 Oct 2026. This is a separate game from v1; v1 scores are n
 
 All three trails share one world: the trailhead clearing at the top, a finish clearing with the same three gates below Flow Monster's finish. Riding out through a gate is seamless (no reload); that gate's trail is your run. Flow Monster's hill is the mountain and Flow Monster is unchanged.
 
-- Jolly Green Giant: 2028 m, out to the west in 68-degree traverses and switchbacks, -0.14 overall (the mountain drops 290 m; about 2.6-2.9 km would be needed for the old -0.10).
-- Back in Black: 1234.5 m, nearly straight down to the east, -0.235 overall (Flow Monster -0.226). Seven mandatory gaps: on a shared mountain the jumps' drops come out of the straights, so nine left them too flat.
+- Jolly Green Giant: 2070 m, out to the west in 68-degree traverses (with gentle bermed bends) and switchbacks, big pump-only rollers, -0.14 overall (the mountain drops 290 m; about 2.6-2.9 km would be needed for the old -0.10).
+- Back in Black: 1339 m, twisty (straights with a gap each, joined by bermed S-bends), -0.217 overall (Flow Monster -0.226). Six mandatory gaps.
 - Lines at least 40 m apart outside the 150 m approaches to the clearings (measured: 56 m and more). Near the clearings they run side by side into their gates.
 - Assumptions to agree: green's length (2 km gives -0.14, faster than the old green); the cliff limit off the trails is 0.55 m per 0.5 m (Flow Monster's own banks reach 0.505); between two trails running side by side into a clearing, and within 40 m of a clearing, banks may be as steep as a berm (0.85 m per 0.5 m).

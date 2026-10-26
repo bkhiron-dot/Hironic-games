@@ -26,12 +26,12 @@ test('on the trail, the ground is its own: the mountain changes nothing past the
 // Speed (km/h) to hold into each lip, and whether to pop: about what you reach flat out (see the
 // trail file).
 const LIP_PLAN = {
-  160: { kmh: 60, pop: 0 }, 290: { kmh: 62, pop: 3 }, 430: { kmh: 66, pop: 0 }, 570: { kmh: 78, pop: 0 },
-  720: { kmh: 76, pop: 0 }, 860: { kmh: 76, pop: 0 }, 1010: { kmh: 76, pop: 0 },
+  171: { kmh: 60, pop: 3 }, 364: { kmh: 60, pop: 3 }, 560: { kmh: 70, pop: 0 },
+  755: { kmh: 62, pop: 3 }, 950: { kmh: 62, pop: 0 }, 1150: { kmh: 62, pop: 3 },
 };
 
 test('from the trailhead to the finish clearing, landing every gap smooth', () => {
-  const run = rideTrail({ trail: T, trees: worldForest().treeBuckets, lipPlan: LIP_PLAN, cruise: 75 });
+  const run = rideTrail({ trail: T, trees: worldForest().treeBuckets, lipPlan: LIP_PLAN, cruise: 65 });
   assert.equal(run.fence, null, 'never touched the fence');
   assert.equal(run.crash, null, `crashed: ${run.crash?.reason} at ${run.crash?.s.toFixed(0)} m`);
   assert.deepEqual(run.splitsPassed, T.splits);

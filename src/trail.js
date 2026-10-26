@@ -41,6 +41,7 @@ const BERM_MAX_PER_WIDTH = 0.85;  // a berm wall is at most 0.85 x the half widt
 const PATH_MARGIN = 120;          // the path is measured this far beyond each end (m)
 const PAYBACK_BEFORE = 15;        // on the mountain, jumps' drops are paid back between jumps: not on a jump, nor in the 15 m before its kicker,
 const PAYBACK_AFTER = 0.5;        // nor before halfway down its landing (the steep part)
+const GRADING_EASE = 120;           // a graded mountain trail follows the plain mountain this near its clearings (m)
 const LEVEL_EASE = 50;            // a mountain trail eases to its clearings' levels over this (m)
 
 const waveList = list => (list || []).map(w => ({ amp: w.amp, period: w.period, phase: w.phase || 0 }));
@@ -91,7 +92,10 @@ export function defineTrail(data, { mountain, startLevel, finishLevel } = {}) {
   // either way along the trail. That evens out the steep bits, like switchback corners.
   const mountainAlong = onMountain ? tableOf(s => hillBase(path.downhillAt(s)), -PATH_MARGIN, length + PATH_MARGIN, 0.25) : () => 0;
   const smoothed = onMountain && data.hill.smooth ? movingAverage(mountainAlong, -PATH_MARGIN, length + PATH_MARGIN, data.hill.smooth) : null;
-  const grading = s => (smoothed ? smoothed(s) - mountainAlong(s) : 0);
+  // (eased out over the GRADING_EASE m nearest each clearing, where the trails run side by side
+  // into their gates: there each follows the mountain itself, so they meet it at the same level)
+  const gradingShare = s => smoothstep((s - data.start.gate) / GRADING_EASE) * smoothstep((length - s) / GRADING_EASE);
+  const grading = s => (smoothed ? (smoothed(s) - mountainAlong(s)) * gradingShare(s) : 0);
 
   // On the mountain: how far the riding line sits above (+) or below (-) the mountain at s,
   // leaving out the features' own shapes: its grading; each jump's drop, ramping in across it

@@ -60,8 +60,9 @@ Built by Ben with his three boys, partly as a way for them to learn coding. Keep
 - The centreline is laid out as sideways sine waves of `d`; `src/path.js` measures it. World point for (s, off): `trail.pointAt(s, off)`; height: `trail.ground(s, off)` or `trail.groundAt(x, z)`; back again: `trail.locate(x, z)`. Rider travels toward -z.
 - The hill is a function of world position (`d`) with each jump's drop built in as a terrace. Near the trail the ground is the riding line + dish + berms + banks; from 6 m past the edge it blends into the hill by 20 m, so tight bends can't make cliffs. Bends tighter than about 35 m radius are refused (the detailed ground would fold).
 - Heading `h`: forward vector `(sin h, 0, -cos h)`; right vector `(cos h, 0, sin h)`. Bike `rotation.y = -h`, rotation order `YXZ`.
-- Jolly Green Giant (`src/trails/jolly-green-giant.js`, green; re-laid in next 4.0): 2028 m to ride, 1180 m straight down, out to the west (as far as x = -600). Centreline `{ x0, heading, turns }`: traverses at 68 degrees across the fall line joined by switchback corners (radius 55 m at the tightest). Graded (`hill.smooth: 60`). -0.14 overall; flat out without features it coasts 44-73 km/h. Half width 4.5-5.5 m; 1.8 m berms from 170 m radius. 8 roller sets (4 pump, 4 gap sets 0.55 m, 6.5 m apart) and 4 tabletops on the traverses; splits at 480, 1040, 1530, finish 2028 m. At least 61 m from FM outside the approaches.
-- Back in Black (`src/trails/back-in-black.js`, black; re-laid in next 4.0): 1234.5 m to ride, 1204 m straight down, out to the east and nearly straight down; shifts and a gentle wave (bends no tighter than 97 m radius). -0.235 overall. Half width 2.2-3.6 m; 2 m berms. Seven mandatory gaps (drop 160, gap 290, step-down 430, step-up 570, gap 720, step-up 860, gap 1010); splits at 380, 660, 950, finish 1234.5 m. At least 61 m from FM outside the approaches.
+- Jolly Green Giant (`src/trails/jolly-green-giant.js`, green; re-laid in next 4.0, bends and big rollers 26 Oct): 2070 m to ride, 1180 m straight down, out to the west (as far as x = -600). Centreline `{ x0, heading, turns }`: traverses at 68 degrees across the fall line joined by switchback corners (55 m radius at the tightest), with gentle 7-degree bends along each traverse (about 85 m radius, gentle berms; berms on 477 m of trail, was 453). Graded (`hill.smooth: 60`, eased out within 120 m of each clearing). -0.14 overall. Half width 4.5-5.5 m; 1.8 m berms from 170 m radius. 7 big roller sets (4 pump sets 1.2 m high, 20 m apart; 3 whoops 1.1 m, 13 m apart), pump-only (`pop: false`), and 4 big tabletops, all on straights; splits at 480, 1050, 1450, finish 2070.4 m. At least 42 m from FM outside the approaches.
+- Back in Black (`src/trails/back-in-black.js`, black; re-laid in next 4.0, twisty 26 Oct): 1339 m to ride, 1204 m straight down, out to the east. Centreline `{ x0, heading, turns }`: fast straights (one gap each) joined by S-bends (45 degrees across and back, 46 m radius at the tightest) with 2 m berms (berms on 336 m, was 12). -0.217 overall (FM -0.226). Half width 2.2-3.6 m. Six mandatory gaps (gap 171, gap 364, step-down 560, step-up 755, drop 950, step-up 1150); splits at 300, 680, 880, finish 1339.3 m. At least 78 m from FM outside the approaches.
+- A mountain trail's hillside offset (how far the hillside round it sits above or below the mountain) is a smooth 5 m map averaged over the nearby trail, so inside tight bends the two sides blend (taking the nearest point's offset made a step where the nearest point jumps across the bend).
 - On the mountain, each jump's drop is paid back on the stretches between jumps (1/6, 1/3 on the two before it, 1/3, 1/6 on the two after), so the trail stays within about 8 m of the hillside; the ground beside a mountain trail keeps the hill's tilt across it (benched in).
 - Flow Monster (`src/trails/flow-monster.js`, blue; was "Hardline" until step 3): centreline `x = 22 sin(d/45) + 8 sin(d/23 + 1)`, the same shape on the hill as v1; 1200 m straight down, 1297 m to ride. Hill grade -0.2 (11 degrees) with a 7 m sine undulation and a steeper chute 500-580 m down. Jumps at 177, 438, 743, 1037 m; splits at 326, 650, 974, finish 1297 m.
 
@@ -108,19 +109,21 @@ Jump shapes and their declared landing ranges live in `src/jumps.js` and are che
 | Big, pop optional, stretched (438 m) | 56-74 no pop, 46-62 pop | Ben overshot it with a pop (lip about 56-61 km/h). Kicker 14 m (was 10), lip 1.5 m, gap 8 m (was 8.5), landing 50 m (was 42). No pop touches down at the top of the landing (8-12 m past the lip), a pop at Ben's speeds deep in it (15-22 m; sweet spot ends 23.5 m). No pop: heavy 54 and 76, small crash 52, cased below 52. Pop: heavy 40-44 and 64-66, small crash 68-70, big crash from 72 |
 | Big, needs pop, kind `bigPop` (1037 m) | 54-66 pop; no pop cases | Shaped with Ben (tuning rounds 2-4): kicker 12 m, lip 1.8 m, gap 12 m, knuckle 2.4 m, landing 48 m at pitch 0.7. Sweet spot 12.3-30.1 m past the lip. Round 3's 2.2 m lip overshot with a pop at speed; this one is built for a fast pop (lip reachable at about 62 on Flow Monster) |
 
-Jolly Green Giant on the mountain (next 4.0; ridden on the trail itself). No pop, every tabletop is rolled or landed smooth from 14 to 62-70 km/h; coming up short lands on the deck:
+Jolly Green Giant on the mountain (next 4.0; ridden on the trail itself). No pop, every tabletop is rolled or landed smooth from 14 to 70 km/h; coming up short lands on the deck. All four are the big shape (kicker 12, lip 1.0, deck 7.5, landing 32 at 0.45):
 
-| Tabletop | Shape | No pop | Full pop | Flat out (holding 45) |
-|---|---|---|---|---|
-| 300 m | kicker 8, lip 0.9, deck 4.5, landing 24 at 0.42 | clean 14-70 | smooth 42-48, no crash to 48, big crash 58-70 | 46 (44) |
-| 520 m | same | clean 14-70 | smooth 14-42, no crash to 52, big crash from 54 | 44 (43) |
-| 890 m | kicker 12, lip 1.0, deck 7.5, landing 32 at 0.45 | clean 14-76 | smooth 14-60 | 62 (47) |
-| 1090 m | same | clean 14-76 | smooth 42-60, no crash to 64 | 51 (45) |
+| Tabletop | No pop | Full pop | Flat out, popping |
+|---|---|---|---|
+| 262 m | clean 14-76 | smooth 42-60, no crash to 64 | 49 |
+| 538 m | clean 14-76 | smooth 34-60, no crash to 62 | 44 |
+| 952 m | clean 14-76 | smooth 38-68, no crash to 68 | 57 |
+| 1212 m | clean 14-76 | smooth 40-64, no crash to 64 | 48 |
 
-| Roller set | Rolled | Full pop at a crest |
+| Roller set (pump only: no pop at the crests) | Rolled | Pumping a set from 30 km/h (coast / pump / pedal) |
 |---|---|---|
-| Pump sets (190, 410, 1180, 1850 m): 0.6 m, 10 m apart | smooth 15-75 | smooth to 30, heavy 35-40, small crash 45-65 |
-| Gap sets (590, 975, 1470, 1770 m): 0.55 m, 6.5 m apart, face 0.6 | smooth 15-75 | gapped and smooth 50/55-70; below that heavy, no crash |
+| Pump sets (130, 615, 1290, 1835 m): 3 x 1.2 m, 20 m apart | smooth 20-75 (below about 18 km/h you can't get over one) | +4 to +15 / +24 to +31 / +17 to +21 km/h |
+| Whoops (360, 1085, 1540 m): 4 x 1.1 m, 13 m apart, face 0.6 | smooth 20-75 | -5 to +12 / +20 to +29 / +14 to +19 km/h |
+
+Ben (26 Oct): rollers at least double the size (were 0.55-0.6 m, 6.5-10 m apart). At that size a pop at a crest lands in the next roller's face (big crash from about 35-60 km/h) and no reachable speed gaps them, so they're pump-only.
 
 Findings: with 1.5 g in the air and a 3 m/s pop, a crest-to-crest flight lasts about 0.4 s, so rollers 10 m apart can't be gapped at reachable speeds (6.5 m can). A pop at 50 km/h comes down at about -0.45, so a tabletop landing must be that steep and long enough. The mountain drops 290 m, so a 2 km green is -0.14 overall (it coasts to 60-73 km/h on the long traverses); about 2.6-2.9 km would give the old green's -0.10. Corners of an x(d) centreline head straight down the fall line, so they're the steepest bits; grading over 60 m eases them.
 
@@ -128,12 +131,12 @@ Back in Black on the mountain (next 4.0; ranges measured on the trail itself). E
 
 | Feature | Shape | No pop smooth | Full pop smooth | Covered | Used at (flat-out lip speed) |
 |---|---|---|---|---|---|
-| Gap | lip 1.1, knuckle 1.0, landing 38 at 0.3 | 64-88 | 50-68 | 50-88 | 290 (64), 720 (76), 1010 (77) |
-| Step-up | lip 1.4, knuckle 2.0, gap 9, landing 40 at 0.35 | 72-86 | 50-70 | 50-86 | 570 (73), 860 (76) |
-| Step-down | lip 0.9, knuckle -0.6, gap 8, landing 48 at 0.45 | 62-76 | 56-62 | 56-76 | 430 (63) |
-| Drop | kicker 10, lip 0.7, knuckle -1, gap 7, landing 44 at 0.55 | 56-70 | 48-56 | 48-70 | 160 (60) |
+| Gap | lip 1.1, knuckle 1.0, landing 38 at 0.3 | 64-88 | 50-68 | 50-88 | 171 (60), 364 (61) |
+| Step-up | lip 1.4, knuckle 2.0, gap 9, landing 40 at 0.35 | 72-86 | 50-70 | 50-86 | 755 (66), 1150 (68) |
+| Step-down | lip 0.9, knuckle -0.6, gap 8, landing 48 at 0.45 | 62-76 | 56-62 | 56-76 | 560 (70) |
+| Drop | kicker 10, lip 0.7, knuckle -1, gap 7, landing 44 at 0.55 | 56-70 | 48-56 | 48-70 | 950 (62) |
 
-Too slow: cased (big crash). Findings: on a shared mountain a trail's jump drops come out of its straights (the trail must end at the shared finish level), so black has 7 gaps not 9 (its jumps drop 65 m of the mountain's 290). Black is only 4% steeper overall than blue (-0.235 vs -0.226).
+Too slow: cased (big crash). Findings: on a shared mountain a trail's jump drops come out of its straights (the trail must end at the shared finish level), so black has 6 gaps not 9. Twisty with berms (26 Oct) made it 1339 m, so overall it's now slightly gentler than blue (-0.217 vs -0.226); it's the hardest for its narrow line, tight bermed S-bends and mandatory gaps. The test rider holds 65 km/h between gaps (at 75 it ran wide out of an S-bend into a tree).
 
 Fastest reachable lip speed on Flow Monster (flat out from the trailhead drop-in, pedalling all the way, scripted rider): 177 m about 68, 438 m about 55-59 (kicker 14 m), 743 m about 74-78, 1037 m about 64-66 km/h. So the "pop optional" jump lands without a pop at 52-56 km/h on Flow Monster. These are conservative: Ben has reached the last lip at 66 km/h (scripted rider about 61-63), so leave headroom above them when shaping a jump.
 

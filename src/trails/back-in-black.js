@@ -14,7 +14,7 @@ const GAP = { kind: 'normal', kick: 12, lip: 1.1, gap: 8.5, hole: -1, knuck: 1, 
   landings: [
     { pop: 0, from: 64, to: 88, outcome: 'smooth' },
     { pop: 3, from: 50, to: 68, outcome: 'smooth' },
-    { pop: 0, from: 40, to: 56, outcome: 'big crash' }, // too slow without a pop: cased
+    { pop: 0, from: 40, to: 54, outcome: 'big crash' }, // too slow without a pop: cased
   ] };
 // Step-up: the landing's knuckle is 0.6 m above the lip.
 const STEP_UP = { kind: 'normal', kick: 12, lip: 1.4, gap: 9, hole: -1, knuck: 2, pitch: 0.35, land: 40,
@@ -45,22 +45,34 @@ export default {
   id: 'back-in-black',
   name: 'Back in Black',
   difficulty: 'black',
-  length: 1234.5,
+  length: 1339.3,
   seed: 20261026,
 
-  // From the trailhead's right-hand gate it heads out to the right (east), then runs nearly
-  // straight down the mountain with gentle wiggles (bends no tighter than 97 m radius), and back
-  // in to the finish clearing's right-hand gate: 1234.5 m to ride, 1204 m straight down, at
-  // least 61 m from Flow Monster except near the clearings. (Laid out like Jolly Green Giant's.)
+  // From the trailhead's right-hand gate it heads out to the right (east), then down the mountain
+  // in fast straights (one gap on each) joined by S-bends: a hard turn across (45 degrees, as tight
+  // as 46 m radius) and back, each with a 2 m berm. Back in to the finish clearing's right-hand
+  // gate: 1339 m to ride, 1204 m straight down, at least 78 m from Flow Monster except near the
+  // clearings. Laid out by distance d straight down the hill: it starts at x0 heading `heading`
+  // degrees from straight down (+ is to the right, east); at each turn it turns to the new heading,
+  // smoothly over about 4 x `over` metres down the hill.
   centreline: {
-    x0: 5.967,
-    shifts: [
-      { at: 0.1, by: 23.427, over: 30.465 },
-      { at: 41.844, by: 59.418, over: 40.869 },
-      { at: 1069.378, by: -47.696, over: 45.566 },
-      { at: 1204, by: -6.546, over: 18.857 },
+    x0: 24.432,
+    heading: 34,
+    turns: [
+      { at: 20, heading: 50, over: 4 },
+      { at: 90, heading: 20, over: 5.89 },
+      { at: 225, heading: -45, over: 12.763 },
+      { at: 270, heading: -20, over: 4.909 },
+      { at: 405, heading: 45, over: 12.763 },
+      { at: 450, heading: 20, over: 4.909 },
+      { at: 585, heading: -45, over: 12.763 },
+      { at: 630, heading: -20, over: 4.909 },
+      { at: 765, heading: 45, over: 12.763 },
+      { at: 810, heading: 20, over: 4.909 },
+      { at: 945, heading: -45, over: 12.763 },
+      { at: 990, heading: -23.6, over: 4.202 },
+      { at: 1192, heading: -10, over: 4 },
     ],
-    waves: [{ amp: 5.197, period: 40.693, phase: -3.1425, from: 127.877, to: 1050, fade: 115.75 }],
   },
   // Narrow: half width 2.2-3.6 m (Flow Monster 2.3-5.4).
   width: { base: 2.8, waves: [{ amp: 0.6, period: 50, phase: 0.8 }], min: 2.2, max: 3.6 },
@@ -69,21 +81,19 @@ export default {
   // Berms on the corners like Flow Monster's (capped at 0.85 x half width on the narrowest bends).
   berms: { auto: true, startCurvature: 0.008, fullCurvature: 0.016, height: 2.0, adjust: [] },
 
-  start: { spawn: -6, gate: 0.3 }, // its gate in the trailhead clearing
-  splits: [380, 660, 950, 1234.5], // each clear of the jumps
+  start: { spawn: -6, gate: 0.12 }, // its gate in the trailhead clearing
+  splits: [300, 680, 880, 1339.3], // each clear of the jumps
 
-  // Seven mandatory gaps (on the shared mountain the jumps' drops are paid back on the stretches
-  // between them, so there is room for fewer than the nine it had on a hill of its own). Riding
-  // flat out and choosing pop or no pop like a rider, you reach the lips at the speeds below
-  // (km/h), each inside its jump's range (the drop's by 5 km/h; the rest by 6 or more).
+  // Six mandatory gaps, one on each straight (on the shared mountain the jumps' drops are paid
+  // back on the stretches between them). Riding flat out and choosing pop or no pop like a rider,
+  // you reach the lips at the speeds below (km/h).
   features: [
-    { type: 'jump', at: 160, ...DROP },       // 60: ride it
-    { type: 'jump', at: 290, ...GAP },        // 64: pop it (ride it from 64)
-    { type: 'jump', at: 430, ...STEP_DOWN },  // 63: ride it
-    { type: 'jump', at: 570, ...STEP_UP },    // 73: ride it
-    { type: 'jump', at: 720, ...GAP },        // 76: ride it
-    { type: 'jump', at: 860, ...STEP_UP },    // 76: ride it
-    { type: 'jump', at: 1010, ...GAP },       // 77: ride it
+    { type: 'jump', at: 171, ...GAP },        // 60: pop it (ride it from 64)
+    { type: 'jump', at: 364, ...GAP },        // 61: pop it
+    { type: 'jump', at: 560, ...STEP_DOWN },  // 70: ride it
+    { type: 'jump', at: 755, ...STEP_UP },    // 66: pop it (ride it from 72)
+    { type: 'jump', at: 950, ...DROP },       // 62: ride it
+    { type: 'jump', at: 1150, ...STEP_UP },   // 68: pop it
   ],
-  scenery: { rocky: [[60, 140], [625, 700]] },
+  scenery: { rocky: [[60, 140], [640, 720]] },
 };

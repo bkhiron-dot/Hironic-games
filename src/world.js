@@ -22,7 +22,7 @@ import { defineTrail } from './trail.js';
 import { createClearing } from './trailhead.js';
 import { smoothstep, movingAverage, tableOf } from './util.js';
 
-const OFFSET_FADE_FROM = 20, OFFSET_FADE_TO = 50; // a mountain trail's hillside offset fades out between these distances (m)...
+const OFFSET_FADE_FROM = 20, OFFSET_FADE_TO = 65; // a mountain trail's hillside offset fades out between these distances (m)...
 const RIDGE_SHARE = 16; // ...and between two trails it gives way to the other's, across the ridge between them (over about 30 m)
 const SMOOTH_OVER = 100; // away from Flow Monster the mountain is its hill averaged over +/-100 m down the hill...
 const OWN_HILL_TO = 30, SMOOTH_FROM = 90; // ...blending from its own hill within 30 m of it to that from 90 m
@@ -51,6 +51,7 @@ export function createWorld(trailData) {
   const trails = trailData.map(d => (isMountain(d) ? defineTrail(d, { mountain, startLevel, finishLevel }) : base));
 
   const map = distanceMap(trails);
+  const offsetMaps = new Map(trails.filter(t => t.onMountain).map(t => [t, offsetMap(t)]));
 
   // Each trail, relative to world point (x, z): where it is on the trail (s, off), metres past
   // its edge, and its own ground there (near, with toHill). A trail that is too far away to
@@ -86,7 +87,7 @@ export function createWorld(trailData) {
         weights += w; nearSum += w * k.near; reach = Math.max(reach, c);
       }
       // a mountain trail's run-outs and level changes shape the hillside round it, fading out
-      if (k.t.onMountain) offset += share * k.t.mountainOffset(k.at.s) * (1 - smoothstep((Math.abs(k.at.off) - OFFSET_FADE_FROM) / (OFFSET_FADE_TO - OFFSET_FADE_FROM)));
+      if (k.t.onMountain) offset += share * offsetMaps.get(k.t)(x, z);
     }
     offset = shares > 0 ? offset / shares : 0; // (no trail near enough to measure: plain mountain)
     const far = reach < 1 ? base.hillside(x, z, bank, mountain.height(-z, x) + offset) : 0;
@@ -184,3 +185,43 @@ function distanceMap(trails) {
   };
 }
 
+
+// How far the hillside round a mountain trail sits above (+) or below (-) the mountain, as a smooth
+// map of the world (5 m squares, read back in straight lines between). Each point takes the
+// trail's offset (trail.mountainOffset) averaged over the nearby trail, weighted by closeness
+// (a bell curve 15 m wide), so inside a tight bend the two sides of the bend blend smoothly
+// (taking the nearest point's offset made a step where the nearest point jumps across the bend).
+// It fades out from 20 m to 65 m from the trail.
+const OFFSET_CELL = 5, OFFSET_SPREAD = 15;
+function offsetMap(t) {
+  const samples = [];
+  for (let s = -120; s <= t.length + 240; s += 4) samples.push({ ...t.pointAt(s), offset: t.mountainOffset(s) });
+  const xs = samples.map(p => p.x), zs = samples.map(p => p.z);
+  const x0 = Math.min(...xs) - OFFSET_FADE_TO, z0 = Math.min(...zs) - OFFSET_FADE_TO;
+  const cols = Math.ceil((Math.max(...xs) + OFFSET_FADE_TO - x0) / OFFSET_CELL) + 1;
+  const rows = Math.ceil((Math.max(...zs) + OFFSET_FADE_TO - z0) / OFFSET_CELL) + 1;
+  const sum = new Float64Array(cols * rows), weight = new Float64Array(cols * rows), closest = new Float64Array(cols * rows).fill(Infinity);
+  const reach = Math.ceil(OFFSET_FADE_TO / OFFSET_CELL);
+  for (const p of samples) {
+    const ci = Math.round((p.x - x0) / OFFSET_CELL), cj = Math.round((p.z - z0) / OFFSET_CELL);
+    for (let j = Math.max(0, cj - reach); j <= Math.min(rows - 1, cj + reach); j++) {
+      for (let i = Math.max(0, ci - reach); i <= Math.min(cols - 1, ci + reach); i++) {
+        const k = j * cols + i, dist = Math.hypot(x0 + i * OFFSET_CELL - p.x, z0 + j * OFFSET_CELL - p.z);
+        if (dist > OFFSET_FADE_TO + 5) continue;
+        const w = Math.exp(-0.5 * (dist / OFFSET_SPREAD) ** 2);
+        sum[k] += w * p.offset; weight[k] += w; closest[k] = Math.min(closest[k], dist);
+      }
+    }
+  }
+  const field = new Float64Array(cols * rows);
+  for (let k = 0; k < field.length; k++) {
+    if (weight[k] > 0) field[k] = sum[k] / weight[k] * (1 - smoothstep((closest[k] - OFFSET_FADE_FROM) / (OFFSET_FADE_TO - OFFSET_FADE_FROM)));
+  }
+  return (x, z) => {
+    const u = (x - x0) / OFFSET_CELL, v = (z - z0) / OFFSET_CELL, i = Math.floor(u), j = Math.floor(v);
+    if (i < 0 || j < 0 || i >= cols - 1 || j >= rows - 1) return 0;
+    const fu = u - i, fv = v - j, k = j * cols + i;
+    const top = field[k] + (field[k + 1] - field[k]) * fu, bottom = field[k + cols] + (field[k + cols + 1] - field[k + cols]) * fu;
+    return top + (bottom - top) * fv;
+  };
+}
