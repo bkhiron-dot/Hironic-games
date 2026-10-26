@@ -16,13 +16,22 @@ Agreed with Ben on 24 Oct 2026. This is a separate game from v1; v1 scores are n
 
 - Ben (24 Oct): chill, optional jump rollers, progressing to moderate size jumps by the bottom, similar to Flow Monster's first jumps. Keep the pump mechanic.
 - Wide (half-width about 4.5-5.5 m), gentle grade, big friendly berms on every real corner.
-- Long sets of rollers, no gaps, nothing that can case into a hole.
+- Long sets of rollers, no gaps, nothing that can case into a hole (tabletops: a flat deck instead of a gap).
 - Ben (24 Oct): the whole trail can be rolled, but fast riders can pop and gap roller pairs. So each roller set declares two ranges: rolled (any speed) and gapped with a pop (from what speed). Both are tested like jump ranges.
 - **Pump mechanic** (the point of this trail):
   - Holding compress (Space / Pump button) on the *downslope* (backside) of a roller adds forward speed; holding it on the *upslope* costs a little speed. Releasing on the upslope near the crest gives a small pop.
   - **Popping off a roller** and landing on the next downslope (linking transitions) converts the drop into forward speed instead of losing it: reward a landing where the ground slope matches the trajectory.
   - Expected result: a rider who pumps well can match or beat pedalling speed without touching pedal. Tune and report numbers.
 - Suggested starting physics (to tune): pump gain = k x g x |downslope| while compressed, k about 0.35; upslope penalty about half that.
+- **As built (next 2.0, 25-26 Oct, overnight; numbers to review with Ben):**
+  - 1100 m, half width 4.5-5.5 m, berms 1.8 m from 170 m radius.
+  - **Grade -0.10, not the agreed -0.12.** At -0.12 the speeds reached were above what a popped tabletop could land smooth.
+  - **Pump rollers:** 4 sets, 0.6 m high, 10 m apart. Rolled smooth at 15-65 km/h. Too far apart to gap: a pop lands on the next face.
+  - **Gap sets:** 3 sets, 0.5-0.55 m high, 6.5 m apart, with a longer face. Rolled smooth at 15-65 km/h; a full pop gaps smooth from 55 km/h; slower is heavy, no crash.
+  - **Tabletops:** 5, flat deck at lip height, long steep landings (0.42-0.45). No pop is clean at every speed; a full pop lands smooth up to 52-64 km/h, above the flat-out lip speeds.
+  - **Pump:** 2.5 x g x back slope; face cost 0.5 x g x slope. Matches pedalling at 20-30 km/h and beats it from 40.
+  - **Pop on rollers:** only right at a crest. Elsewhere on a roller set, letting go of Space is just the pump extending.
+- **Switching trails:** ride out of the clearing through another built trail's open gate. The game fades, loads that trail's world (`?trail=<id>`), and you carry on from just above its gate at the same speed.
 
 ### Flow Monster (blue)
 
@@ -34,6 +43,12 @@ Agreed with Ben on 24 Oct 2026. This is a separate game from v1; v1 scores are n
 - Ben (24 Oct): all mandatory gaps, with a range of gap, step-down and step-up features. No B lines.
 - Steeper, narrower trail. Main track surface stays smooth dirt (no rock gardens or roots on the line).
 - Every feature needs a simulated sweet range (reachable on the trail) and a test.
+- **As built (next 3.0, 26 Oct, overnight; numbers to review with Ben):**
+  - **Trail:** 1150 m at grade -0.22, half width 2.2-3.6 m, 2 m berms.
+  - **Long straights between open bends (76 m radius or more).** Twistier lines made steep banks beside the trail on this steeper hill and put landings into bends.
+  - **Nine mandatory gaps:** 4 gaps, 2 step-downs, 1 drop, 2 step-ups.
+  - **Shapes:** all built from Flow Monster's first-jump shape, with the landing moved down or up.
+  - **Pop or ride:** each feature has a no-pop window and a pop window that join. Riding flat out you reach every lip at least 6 km/h inside its range: ride the fast ones, pop the slower ones (420, 1040 m and the step-up at 330 m).
 
 ## Scores
 
@@ -78,3 +93,12 @@ Agreed with Ben on 24 Oct 2026. This is a separate game from v1; v1 scores are n
 - Trail lengths: start equal, maybe lengthen black later.
 - Shared online scoreboard once hosted (needs a small backend).
 - Ghost rider of the record run.
+
+## One mountain (next 4.0, Ben 25 Oct: option B)
+
+All three trails share one world: the trailhead clearing at the top, a finish clearing with the same three gates below Flow Monster's finish. Riding out through a gate is seamless (no reload); that gate's trail is your run. Flow Monster's hill is the mountain and Flow Monster is unchanged.
+
+- Jolly Green Giant: 2070 m, out to the west in 68-degree traverses (with gentle bermed bends) and switchbacks, big pump-only rollers, -0.14 overall (the mountain drops 290 m; about 2.6-2.9 km would be needed for the old -0.10).
+- Back in Black: 1339 m, twisty (straights with a gap each, joined by bermed S-bends), -0.217 overall (Flow Monster -0.226). Six mandatory gaps.
+- Lines at least 40 m apart outside the 150 m approaches to the clearings (measured: 56 m and more). Near the clearings they run side by side into their gates.
+- Assumptions to agree: green's length (2 km gives -0.14, faster than the old green); the cliff limit off the trails is 0.55 m per 0.5 m (Flow Monster's own banks reach 0.505); between two trails running side by side into a clearing, and within 40 m of a clearing, banks may be as steep as a berm (0.85 m per 0.5 m).

@@ -9,7 +9,10 @@ import { NEAR_REACH } from './trail.js';
    physics uses), so what you see is always what you ride on:
    - a detailed strip that follows the trail: fine columns across the trail, then wider
      columns out to NEAR_REACH past the edge, where the ground has become plain hillside;
-   - a coarse hillside grid beyond it, tucked just under the strip where they overlap. */
+   - a coarse hillside grid beyond it, tucked just under the strip where they overlap.
+   On the mountain (src/world.js) every trail has its own strip and there is one hillside grid
+   for them all. Where two strips overlap (near the clearings) the nearer trail's is drawn on top:
+   the other is tucked STRIP_TUCK under it. */
 
 const ACROSS_TRAIL = [-1, -0.8, -0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6, 0.8, 1]; // fractions of the half width
 const BEYOND_EDGE = [0.6, 1.4, 2.6, 4.2, 6.5, 10, 14, 19, NEAR_REACH];      // metres past the trail edge
@@ -19,6 +22,15 @@ const stripFrom = trail => trail.trailhead ? STRIP_FROM_TRAILHEAD : STRIP_FROM;
 const GRID_CELL = 4;      // hillside grid spacing (m)
 const GRID_MARGIN = 160;  // hillside reaches this far sideways beyond the trail's widest swing (m)
 const TUCK = 0.4;         // hillside sits this far under the strip where they overlap (m)
+const OUT_OF_SIGHT = 140; // on the mountain, hillside this far from every trail is always lost in the mist (m)
+const STRIP_TUCK = 0.15;  // a strip sits this far under a nearer trail's strip (m)
+
+// On the mountain: which trail's strip is drawn at a point, from the trails near it (nearest
+// first, see world.sample): the nearest one whose strip reaches there.
+function stripOwner(near) {
+  const k = near.find(n => n.s > STRIP_FROM_TRAILHEAD && n.s < n.trail.length + STRIP_PAST_END && n.past < NEAR_REACH);
+  return k ? k.trail.id : null;
+}
 
 const COLOURS = {
   trail: 0xc0905e, trail2: 0xa87a4c, edge: 0x96693f, litter: 0x9a7647,
@@ -38,11 +50,13 @@ function floorColour(out, c, noise, x, z) {
 // The trailhead clearing (if this trail has one) is packed dirt: blend toward it by how
 // much of the pad is at (x, z). n is a 0..1 speckle.
 function padColour(out, c, trail, n, x, z) {
-  const pad = trail.trailhead ? trail.trailhead.padAmount(x, z) : 0;
+  const pad = trail.world ? trail.world.padAmount(x, z) : trail.trailhead ? trail.trailhead.padAmount(x, z) : 0;
   if (pad > 0) out.lerp(PAD_TMP.copy(c.edge).lerp(c.trail2, 0.3 + n * 0.4), pad);
   return out;
 }
 const PAD_TMP = new THREE.Color();
+// The forest floor pattern is the same all over the mountain, so every mesh's colours match.
+const floorSeed = trail => (trail.world ? trail.world.seed : trail.seed);
 
 // The detailed strip: positions, colours, uvs and triangle indices.
 // Uses `random` once per vertex for colour noise.
@@ -52,19 +66,25 @@ export function terrainData(trail, random) {
   // rows above the usual start (round the trailhead) take their colour noise from their own
   // random sequence, so the forest after the terrain doesn't move
   const above = makeRandom(trail.seed + 2);
-  const cols = ACROSS_TRAIL.length + BEYOND_EDGE.length * 2, rows = S1 - S0 + 1;
+  const cols = ACROSS_TRAIL.length + BEYOND_EDGE.length * 2, rows = Math.floor(S1 - S0) + 1;
   const positions = new Float32Array(rows * cols * 3), colours = new Float32Array(rows * cols * 3);
   const uvs = new Float32Array(rows * cols * 2);
-  const c = palette(), tmp = new THREE.Color(), noise = makeGroundNoise(trail.seed);
+  const c = palette(), tmp = new THREE.Color(), noise = makeGroundNoise(floorSeed(trail));
   let i = 0;
   for (let r = 0; r < rows; r++) {
     const s = S0 + r, w = halfWidth(s);
     const offsets = [...BEYOND_EDGE.slice().reverse().map(d => -(w + d)), ...ACROSS_TRAIL.map(t => t * w), ...BEYOND_EDGE.map(d => w + d)];
     const zone = jumpZone(s), onKicker = !!kickerAt(s);
-    const ridden = !trail.trailhead || s >= 0; // above a trailhead the trail's line is just forest
+    // above a trailhead (and past the finish clearing, on the mountain) the trail's line is just forest
+    const ridden = (!trail.trailhead || s >= 0) && (!trail.world || s <= trail.length + 40);
     for (let col = 0; col < cols; col++, i++) {
       const off = offsets[col], e = Math.abs(off) - w, p = trail.pointAt(s, off);
-      positions[i * 3] = p.x; positions[i * 3 + 1] = ground(s, off); positions[i * 3 + 2] = p.z;
+      let y;
+      if (trail.world) {
+        const here = trail.world.sample(p.x, p.z, { trail: trail.id, s, off });
+        y = here.height - (stripOwner(here.near) === trail.id ? 0 : STRIP_TUCK);
+      } else y = ground(s, off);
+      positions[i * 3] = p.x; positions[i * 3 + 1] = y; positions[i * 3 + 2] = p.z;
       uvs[i * 2] = p.x / 2.5; uvs[i * 2 + 1] = -p.z / 2.5;
       const n = s < STRIP_FROM ? above() : random();
       if (!ridden) {
@@ -87,7 +107,7 @@ export function terrainData(trail, random) {
       colours[i * 3] = tmp.r; colours[i * 3 + 1] = tmp.g; colours[i * 3 + 2] = tmp.b;
     }
   }
-  return { positions, colours, uvs, indices: gridIndices(rows, cols) };
+  return { positions, colours, uvs, indices: gridIndices(rows, cols), rows, cols };
 }
 
 // Triangles for a rows x cols grid of vertices (rows going downhill, columns toward +x).
@@ -105,38 +125,52 @@ function gridIndices(rows, cols, keep = () => true) {
 }
 
 // The hillside grid beyond the strip. Vertices under the strip are tucked down by TUCK, and
-// cells entirely under it are left out.
-export function hillsideData(trail) {
-  const { halfWidth } = trail;
-  let minX = Infinity, maxX = -Infinity;
-  for (let s = stripFrom(trail); s <= trail.length + STRIP_PAST_END; s += 5) {
-    const p = trail.pointAt(s);
-    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+// cells entirely under it are left out. trails: one trail, or every trail on the mountain.
+export function hillsideData(trails) {
+  trails = [].concat(trails);
+  const trail = trails[0], world = trail.world;
+  let minX = Infinity, maxX = -Infinity, maxZ = -Infinity, minZ = Infinity;
+  for (const t of trails) {
+    for (let s = stripFrom(t); s <= t.length + STRIP_PAST_END; s += 5) {
+      const p = t.pointAt(s);
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); maxZ = Math.max(maxZ, p.z); minZ = Math.min(minZ, p.z);
+    }
   }
-  const x0 = minX - GRID_MARGIN, z0 = trail.pointAt(stripFrom(trail)).z + 120;
-  const zEnd = trail.pointAt(trail.length + STRIP_PAST_END).z - 60;
+  const x0 = minX - GRID_MARGIN, z0 = maxZ + 120, zEnd = minZ - 60;
   const cols = Math.ceil((maxX + GRID_MARGIN - x0) / GRID_CELL) + 1, rows = Math.ceil((z0 - zEnd) / GRID_CELL) + 1;
   const positions = new Float32Array(rows * cols * 3), colours = new Float32Array(rows * cols * 3);
-  const uvs = new Float32Array(rows * cols * 2), deepUnder = new Uint8Array(rows * cols);
-  const c = palette(), tmp = new THREE.Color(), noise = makeGroundNoise(trail.seed);
+  const uvs = new Float32Array(rows * cols * 2), deepUnder = new Uint8Array(rows * cols), unseen = new Uint8Array(rows * cols);
+  const c = palette(), tmp = new THREE.Color(), noise = makeGroundNoise(floorSeed(trail));
   let i = 0;
   for (let r = 0; r < rows; r++) {
     for (let col = 0; col < cols; col++, i++) {
       const x = x0 + col * GRID_CELL, z = z0 - r * GRID_CELL;
-      const at = trail.locate(x, z);
-      const insideStrip = at.s > stripFrom(trail) && at.s < trail.length + STRIP_PAST_END;
-      const past = Math.abs(at.off) - halfWidth(at.s); // metres past the trail edge
-      const under = insideStrip && past < NEAR_REACH - 0.5;
-      deepUnder[i] = insideStrip && past < NEAR_REACH - GRID_CELL * 1.5 ? 1 : 0;
-      positions[i * 3] = x; positions[i * 3 + 1] = trail.groundAt(x, z) - (under ? TUCK : 0); positions[i * 3 + 2] = z;
+      // how far past the edge of the nearest trail whose strip reaches here (metres)
+      let past = Infinity, height;
+      if (world && world.farFromTrails(x, z, OUT_OF_SIGHT)) {
+        unseen[i] = 1; // never seen up close: left out (its height doesn't matter)
+        height = world.mountain.height(-z);
+      } else if (world) {
+        const here = world.sample(x, z);
+        for (const n of here.near) if (n.s > STRIP_FROM_TRAILHEAD && n.s < n.trail.length + STRIP_PAST_END) past = Math.min(past, n.past);
+        height = here.height;
+      } else {
+        const at = trail.locate(x, z);
+        if (at.s > stripFrom(trail) && at.s < trail.length + STRIP_PAST_END) past = Math.abs(at.off) - trail.halfWidth(at.s);
+        height = trail.groundAt(x, z);
+      }
+      const under = past < NEAR_REACH - 0.5;
+      deepUnder[i] = past < NEAR_REACH - GRID_CELL * 1.5 ? 1 : 0;
+      positions[i * 3] = x; positions[i * 3 + 1] = height - (under ? TUCK : 0); positions[i * 3 + 2] = z;
       uvs[i * 2] = x / 2.5; uvs[i * 2 + 1] = -z / 2.5;
       floorColour(tmp, c, noise, x, z);
       padColour(tmp, c, trail, noise(x * 3.1, z * 3.1), x, z);
       colours[i * 3] = tmp.r; colours[i * 3 + 1] = tmp.g; colours[i * 3 + 2] = tmp.b;
     }
   }
-  const indices = gridIndices(rows, cols, (a, b, d, e) => !(deepUnder[a] && deepUnder[b] && deepUnder[d] && deepUnder[e]));
-  return { positions, colours, uvs, indices };
+  const all = (flags, a, b, d, e) => flags[a] && flags[b] && flags[d] && flags[e];
+  const indices = gridIndices(rows, cols, (a, b, d, e) => !all(deepUnder, a, b, d, e) && !all(unseen, a, b, d, e));
+  return { positions, colours, uvs, indices, rows, cols };
 }
 
 // Grainy dirt texture: soil speckle, small stones and leaf flecks, multiplied over the colours.
@@ -168,21 +202,60 @@ function dirtTexture(renderer) {
   return texture;
 }
 
-function addMesh(scene, data, material) {
+// The ground is drawn in pieces (50 m of strip, or 100 m squares of hillside), and only the
+// pieces near the rider are drawn: on the mountain there's far more ground than a phone can draw
+// every frame. Each piece is its own mesh, sharing the whole grid's vertices (and normals, worked
+// out once, so the pieces' lighting matches where they meet).
+const STRIP_PIECE_ROWS = 50, GRID_PIECE = 25; // rows of strip; rows and columns of hillside
+const SHOW_WITHIN = 260; // metres: the mist hides everything past 165 m; this leaves room to spare
+
+function addMesh(scene, data, material, pieceOf) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
   geometry.setAttribute('color', new THREE.BufferAttribute(data.colours, 3));
   geometry.setAttribute('uv', new THREE.BufferAttribute(data.uvs, 2));
   geometry.setIndex(data.indices);
   geometry.computeVertexNormals();
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.receiveShadow = true;
-  mesh.frustumCulled = false;
-  scene.add(mesh);
+  // split the triangles into pieces by the grid cell they belong to
+  const pieces = new Map();
+  for (let i = 0; i < data.indices.length; i += 6) {
+    const a = data.indices[i], key = pieceOf(Math.floor(a / data.cols), a % data.cols);
+    if (!pieces.has(key)) pieces.set(key, []);
+    const list = pieces.get(key);
+    for (let k = 0; k < 6; k++) list.push(data.indices[i + k]);
+  }
+  const meshes = [];
+  for (const indices of pieces.values()) {
+    const piece = new THREE.BufferGeometry();
+    for (const name of ['position', 'color', 'uv', 'normal']) piece.setAttribute(name, geometry.getAttribute(name));
+    piece.setIndex(indices);
+    const box = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+    for (const v of indices) {
+      const x = data.positions[v * 3], z = data.positions[v * 3 + 2];
+      box.minX = Math.min(box.minX, x); box.maxX = Math.max(box.maxX, x); box.minZ = Math.min(box.minZ, z); box.maxZ = Math.max(box.maxZ, z);
+    }
+    const mesh = new THREE.Mesh(piece, material);
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false; // shown by distance instead (showNear)
+    scene.add(mesh);
+    meshes.push({ mesh, box });
+  }
+  return meshes;
 }
 
-export function buildTerrain(scene, renderer, trail, random) {
+// trails and randoms: one trail and its random sequence, or lists of them (the mountain).
+// Returns showNear(x, z): draw only the ground within SHOW_WITHIN of (x, z).
+export function buildTerrain(scene, renderer, trails, randoms) {
   const material = new THREE.MeshLambertMaterial({ vertexColors: true, map: dirtTexture(renderer) });
-  addMesh(scene, terrainData(trail, random), material);
-  addMesh(scene, hillsideData(trail), material);
+  trails = [].concat(trails); randoms = [].concat(randoms);
+  const pieces = [];
+  trails.forEach((t, i) => pieces.push(...addMesh(scene, terrainData(t, randoms[i]), material, row => Math.floor(row / STRIP_PIECE_ROWS))));
+  pieces.push(...addMesh(scene, hillsideData(trails), material, (row, col) => Math.floor(row / GRID_PIECE) * 10000 + Math.floor(col / GRID_PIECE)));
+  function showNear(x, z) {
+    for (const { mesh, box } of pieces) {
+      const dx = Math.max(0, box.minX - x, x - box.maxX), dz = Math.max(0, box.minZ - z, z - box.maxZ);
+      mesh.visible = dx * dx + dz * dz < SHOW_WITHIN * SHOW_WITHIN;
+    }
+  }
+  return { showNear };
 }

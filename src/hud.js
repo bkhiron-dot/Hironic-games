@@ -11,8 +11,9 @@ export const formatTime = t => {
 };
 const formatDelta = d => (d < 0 ? '-' : '+') + Math.abs(d).toFixed(2);
 
-export function createHud({ scores, trail, coarse }) {
-  const splitCount = trail.splits.length, finishBoard = splitCount - 1;
+// trails: every trail with high scores (each gets its own section of the board).
+export function createHud({ scores, trail, trails = [trail], coarse }) {
+  const splitCount = trail.splits.length, finishBoard = splitCount - 1; // the same on every trail
   const $ = id => document.getElementById(id);
   const el = {
     time: $('time'), speed: $('speed'), gripFill: $('gripFill'), gripLabel: $('gripLabel'),
@@ -37,11 +38,19 @@ export function createHud({ scores, trail, coarse }) {
     el.pbLine.textContent = r ? 'Course record: ' + r.name + '  ' + formatTime(r.time) : 'No finish times yet. Set the first course record.';
   }
 
-  // Draws every scoreboard on the page (start and end screens), each on its own tab.
+  // Draws every scoreboard on the page (start and end screens). Each has a section per trail
+  // (the trail being ridden unless another is picked) and a tab per split.
   function renderBoards() {
     document.querySelectorAll('.scoreboard').forEach(board => {
-      const tab = +board.dataset.tab || 0, rows = scores.top(trail.id, tab);
-      let h = '<div class="hs-title">HIGH SCORES</div><div class="hs-tabs" role="tablist">';
+      const shown = trails.find(t => t.id === board.dataset.trail) || trail;
+      const tab = +board.dataset.tab || 0, rows = scores.top(shown.id, tab);
+      let h = '<div class="hs-title">HIGH SCORES</div>';
+      if (trails.length > 1) {
+        h += '<div class="hs-trails" role="tablist" aria-label="Trail">';
+        for (const t of trails) h += `<button class="hs-trail ${t.difficulty}" role="tab" type="button" data-trail="${t.id}" aria-selected="${t === shown}" title="${t.name}">${t.difficulty.toUpperCase()}</button>`;
+        h += `</div><div class="hs-trail-name">${shown.name}</div>`;
+      }
+      h += '<div class="hs-tabs" role="tablist">';
       BOARD_NAMES.forEach((n, i) => { h += `<button class="hs-tab" role="tab" type="button" data-i="${i}" aria-selected="${i === tab}">${i === finishBoard ? 'FIN' : 'S' + (i + 1)}</button>`; });
       h += '</div><div class="hs-table" role="table" aria-label="' + BOARD_NAMES[tab] + ' top 10">';
       for (let k = 0; k < 10; k++) {
@@ -49,12 +58,13 @@ export function createHud({ scores, trail, coarse }) {
         if (r) h += `<div class="hs-row${k === 0 ? ' first' : ''}${mineIds.has(r.id) ? ' mine' : ''}" role="row"><span>${k + 1}.</span><span></span><span>${formatTime(r.time)}</span></div>`;
         else h += `<div class="hs-row empty" role="row"><span>${k + 1}.</span><span>----------</span><span>-:--.--</span></div>`;
       }
-      h += '</div><div class="hs-note">' + BOARD_NAMES[tab] + ' · this device</div>';
+      h += '</div><div class="hs-note">' + shown.name + ' · ' + BOARD_NAMES[tab] + ' · this device</div>';
       board.innerHTML = h;
       // names go in as text, never as HTML
       const nameCells = board.querySelectorAll('.hs-row:not(.empty) span:nth-child(2)');
       rows.slice(0, 10).forEach((r, k) => { if (nameCells[k]) nameCells[k].textContent = r.name; });
       board.querySelectorAll('.hs-tab').forEach(t => t.addEventListener('click', () => { board.dataset.tab = t.dataset.i; renderBoards(); }));
+      board.querySelectorAll('.hs-trail').forEach(t => t.addEventListener('click', () => { board.dataset.trail = t.dataset.trail; renderBoards(); }));
     });
     courseRecordLine();
   }
@@ -114,7 +124,9 @@ export function createHud({ scores, trail, coarse }) {
       el.nameInput.value = last;
     }
     // open the board for the furthest split reached
-    el.finishScreen.querySelector('.scoreboard').dataset.tab = reached ? String(reached - 1) : String(finishBoard);
+    const board = el.finishScreen.querySelector('.scoreboard');
+    board.dataset.tab = reached ? String(reached - 1) : String(finishBoard);
+    board.dataset.trail = trail.id; // the trail just ridden
     renderBoards();
     el.finishScreen.hidden = false;
     if (pending.length && !coarse) setTimeout(() => el.nameInput.focus(), 50); // no keyboard pop-up on phones
@@ -134,5 +146,13 @@ export function createHud({ scores, trail, coarse }) {
   });
 
   renderBoards();
-  return { toast, resetSplit, showSplit, hideScreens, update, showRunEnd, renderBoards };
+  // Now riding another trail: its name, and its high scores.
+  function setTrail(t) {
+    trail = t;
+    $('trailName').textContent = trail.name;
+    document.querySelectorAll('.scoreboard').forEach(board => { board.dataset.trail = trail.id; });
+    renderBoards();
+  }
+
+  return { toast, resetSplit, showSplit, hideScreens, update, showRunEnd, renderBoards, setTrail };
 }

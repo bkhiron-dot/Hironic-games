@@ -1,5 +1,5 @@
 // Things standing beside the trail: start, split and finish gates, landing flags,
-// the warning signs before big jumps, and the trailhead's fence, closed gates and map.
+// the warning signs before big jumps, and the clearings' fences, closed gates and map.
 import * as THREE from './three.js';
 import { paintedTexture } from './texture.js';
 
@@ -108,13 +108,13 @@ function markerPosts(scene, trail) {
   }
 }
 
+// The markers along one trail. Its start gate in the trailhead clearing carries its name in its
+// colour. (The clearings themselves: buildClearings.)
 export function buildMarkers(scene, trail) {
   markerPosts(scene, trail);
   if (trail.trailhead) {
-    // the trail's own gate in the clearing carries its name in its colour
-    const own = trail.trailhead.gates.find(g => g.open);
+    const own = trail.trailhead.gate;
     gate(scene, trail, trail.start.gate, own.name.toUpperCase(), own.colour, '#f3f1ea');
-    buildTrailhead(scene, trail);
   } else gate(scene, trail, trail.start.gate, 'START', '#1d2e1f', '#f3f1ea');
   landingFlags(scene, trail);
   trail.splits.forEach((s, i) => {
@@ -141,51 +141,61 @@ function tapeTexture() {
   return texture;
 }
 
-// The map board: every trail's line drawn from its data (only the open one so far).
-function mapTexture(trail) {
+// The map board: every trail's line drawn from its data, and a key to every gate.
+function mapTexture(world) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 512;
   const g = canvas.getContext('2d');
   g.fillStyle = '#efe6cf'; g.fillRect(0, 0, 512, 512);
   g.fillStyle = '#1d2e1f'; g.textAlign = 'center';
-  g.font = 'bold 36px Arial, sans-serif'; g.fillText('MID MOUNTAIN TRAILHEAD', 256, 46);
-  // the trail's line, top of the hill at the top of the board
-  const points = [];
-  for (let s = 0; s <= trail.length; s += 5) points.push(trail.pointAt(s));
-  const xs = points.map(p => p.x), zs = points.map(p => p.z);
+  g.font = 'bold 34px Arial, sans-serif'; g.fillText('MID MOUNTAIN TRAILHEAD', 256, 44);
+  // the trails' lines, top of the hill at the top of the board
+  const lines = world.trails.map(t => { const p = []; for (let s = 0; s <= t.length; s += 5) p.push(t.pointAt(s)); return p; });
+  const all = lines.flat(), xs = all.map(p => p.x), zs = all.map(p => p.z);
   const minX = Math.min(...xs), maxX = Math.max(...xs), maxZ = Math.max(...zs), minZ = Math.min(...zs);
-  const scale = Math.min(150 / (maxX - minX || 1), 360 / (maxZ - minZ));
-  const toBoard = p => [256 + (p.x - (minX + maxX) / 2) * scale, 80 + (maxZ - p.z) * scale];
-  const own = trail.trailhead.gates.find(gt => gt.open);
-  g.strokeStyle = own.colour; g.lineWidth = 7; g.lineJoin = 'round'; g.beginPath();
-  points.forEach((p, i) => { const [x, y] = toBoard(p); if (i) g.lineTo(x, y); else g.moveTo(x, y); });
-  g.stroke();
-  // jumps as orange marks, splits as dark dots
-  g.fillStyle = ORANGE;
-  for (const j of trail.jumps) { const [x, y] = toBoard(trail.pointAt(j.s)); g.fillRect(x - 9, y - 4, 18, 8); }
+  const scale = Math.min(460 / (maxX - minX || 1), 350 / (maxZ - minZ));
+  const toBoard = p => [256 + (p.x - (minX + maxX) / 2) * scale, 70 + (maxZ - p.z) * scale];
+  world.trails.forEach((t, i) => {
+    g.strokeStyle = world.trailhead.gates.find(gt => gt.difficulty === t.difficulty).colour;
+    g.lineWidth = 6; g.lineJoin = 'round'; g.beginPath();
+    lines[i].forEach((p, k) => { const [x, y] = toBoard(p); if (k) g.lineTo(x, y); else g.moveTo(x, y); });
+    g.stroke();
+    // jumps as orange marks
+    g.fillStyle = ORANGE;
+    for (const j of t.jumps) { const [x, y] = toBoard(t.pointAt(j.s)); g.fillRect(x - 6, y - 3, 12, 6); }
+    for (const r of t.rollers) { const [x, y] = toBoard(t.pointAt((r.s + r.end) / 2)); g.fillRect(x - 4, y - 2, 8, 4); }
+  });
+  // the trailhead and the finish clearing
   g.fillStyle = '#1d2e1f';
-  for (const s of trail.splits) { const [x, y] = toBoard(trail.pointAt(s)); g.beginPath(); g.arc(x, y, 7, 0, 2 * Math.PI); g.fill(); }
+  for (const c of [world.trailhead, world.finish]) { const [x, y] = toBoard(c.world(c.at === 'top' ? -18 : 18, 0)); g.fillRect(x - 10, y - 7, 20, 14); }
   // the key: each gate, left to right as you face them
   g.textAlign = 'left';
-  trail.trailhead.gates.forEach((gt, i) => {
-    const x = 12 + i * 168;
+  world.trailhead.gates.forEach((gt, i) => {
+    const x = 12 + i * 168, t = world.trails.find(tr => tr.difficulty === gt.difficulty);
     g.fillStyle = gt.colour; g.fillRect(x, 452, 16, 16);
     g.fillStyle = '#1d2e1f'; g.font = 'bold 19px Arial, sans-serif';
     g.fillText(gt.name, x + 21, 467);
     g.font = '17px Arial, sans-serif';
-    g.fillText(gt.open ? `${(trail.length / 1000).toFixed(1)} km, ${trail.jumps.length} jumps` : 'coming soon', x + 21, 492);
+    g.fillText(t ? `${(t.length / 1000).toFixed(1)} km, ${t.jumps.length} jumps` : 'coming soon', x + 21, 492);
   });
   return paintedTexture(canvas);
 }
 
-function buildTrailhead(scene, trail) {
-  const th = trail.trailhead, facingUp = -th.heading; // faces uphill, toward riders in the clearing
+// The trailhead and the finish clearing: fences, closed gates (trails not built yet), the map.
+export function buildClearings(scene, world) {
+  buildClearing(scene, world, world.trailhead);
+  buildClearing(scene, world, world.finish);
+}
+
+function buildClearing(scene, world, th) {
+  const facingUp = -th.heading; // faces uphill, toward riders in the clearing
   const wood = new THREE.MeshLambertMaterial({ color: 0x7a5a3a });
-  const at = (u, v, up) => { const p = th.world(u, v); return new THREE.Vector3(p.x, trail.groundAt(p.x, p.z) + up, p.z); };
+  const at = (u, v, up) => { const p = th.world(u, v); return new THREE.Vector3(p.x, world.groundAt(p.x, p.z) + up, p.z); };
 
   // Fence posts and two rails round the edge, leaving a gap at every gate.
-  const inGate = v => th.gates.some(g => Math.abs(v - g.v) < th.opening);
-  const corners = [[0, -th.halfWidth], [-th.depth, -th.halfWidth], [-th.depth, th.halfWidth], [0, th.halfWidth], [0, -th.halfWidth]];
+  const inGate = v => th.gates.some(g => Math.abs(v - g.v) < g.opening);
+  const back = th.at === 'top' ? -th.depth : th.depth;
+  const corners = [[0, -th.halfWidth], [back, -th.halfWidth], [back, th.halfWidth], [0, th.halfWidth], [0, -th.halfWidth]];
   const posts = [], rails = [];
   for (let k = 0; k < 4; k++) {
     const [u0, v0] = corners[k], [u1, v1] = corners[k + 1];
@@ -211,30 +221,29 @@ function buildTrailhead(scene, trail) {
   dummy.scale.set(1, 1, 1);
   for (const m of [postMesh, railMesh]) { m.frustumCulled = false; m.castShadow = true; scene.add(m); }
 
-  // Closed gates: posts, a banner with the trail's name, tape across and a "coming soon" board.
+  // Gates of trails not built yet: posts, a banner with the trail's name, tape across and a
+  // "coming soon" board. (Each built trail puts up its own gates: buildMarkers.)
   const tape = new THREE.MeshBasicMaterial({ map: tapeTexture(), side: THREE.DoubleSide });
-  tape.map.repeat.set(th.opening * 2 / 2, 1);
   for (const g of th.gates.filter(gt => !gt.open)) {
+    tape.map.repeat.set(g.opening, 1);
     const postMaterial = new THREE.MeshLambertMaterial({ color: g.colour });
     for (const side of [-1, 1]) {
-      scene.add(placed(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4.6, 8), postMaterial), at(0, g.v + side * th.opening, 2.3), facingUp));
+      scene.add(placed(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 4.6, 8), postMaterial), at(0, g.v + side * g.opening, 2.3), facingUp));
     }
-    const banner = new THREE.Mesh(new THREE.BoxGeometry(2 * th.opening, 0.8, 0.06),
+    const banner = new THREE.Mesh(new THREE.BoxGeometry(2 * g.opening, 0.8, 0.06),
       [postMaterial, postMaterial, postMaterial, postMaterial, new THREE.MeshBasicMaterial({ map: bannerTexture(g.name.toUpperCase(), g.colour, '#f3f1ea') }), postMaterial]);
     scene.add(placed(banner, at(0, g.v, 4.4), facingUp));
-    for (const up of [0.7, 1.15]) scene.add(placed(new THREE.Mesh(new THREE.PlaneGeometry(2 * th.opening, 0.1), tape), at(0, g.v, up), facingUp));
+    for (const up of [0.7, 1.15]) scene.add(placed(new THREE.Mesh(new THREE.PlaneGeometry(2 * g.opening, 0.1), tape), at(0, g.v, up), facingUp));
     const board = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.6),
       new THREE.MeshBasicMaterial({ map: bannerTexture('COMING SOON', '#f2a531', '#1a0d06'), side: THREE.DoubleSide }));
     scene.add(placed(board, at(-0.1, g.v, 1.7), facingUp));
   }
 
-  // The map board, on two posts, to the left of the drop-in.
-  const mapAt = { u: -th.depth + 16, v: th.local(th.dropIn.x, th.dropIn.z).v - 6 };
-  for (const side of [-1, 1]) {
-    const p = th.world(mapAt.u, mapAt.v + side * 1.1);
-    scene.add(placed(new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.6, 0.1), wood), new THREE.Vector3(p.x, trail.groundAt(p.x, p.z) + 1.3, p.z), facingUp));
-  }
-  const map = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshBasicMaterial({ map: mapTexture(trail), side: THREE.DoubleSide }));
+  // At the trailhead, the map board, on two posts, between the green and blue drop-ins.
+  if (th.at !== 'top') return;
+  const mapAt = { u: -th.depth + 16, v: -7.5 };
+  for (const side of [-1, 1]) scene.add(placed(new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.6, 0.1), wood), at(mapAt.u, mapAt.v + side * 1.1, 1.3), facingUp));
+  const map = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2), new THREE.MeshBasicMaterial({ map: mapTexture(world), side: THREE.DoubleSide }));
   scene.add(placed(map, at(mapAt.u, mapAt.v, 1.9), facingUp));
 }
 
