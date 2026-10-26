@@ -1,13 +1,14 @@
 // The rainforest: tall gums, tree ferns, undergrowth, rocks, ground ferns and mossy logs.
 // planForest() decides where everything goes (plain data, testable in Node);
-// buildForest() turns that into meshes. Everything is grouped into 100 m chunks
-// so only the forest near the rider is drawn.
+// buildForest() turns that into meshes. Everything is grouped into 50 m squares of the world
+// (chunks) so only the forest near the rider is drawn.
 import * as THREE from './three.js';
 import { paintedTexture } from './texture.js';
 import { pickFrom, makeRandom } from './util.js';
 
-export const CHUNK_LENGTH = 100;
-export const TREE_BUCKET_LENGTH = 5; // trees are also filed in 5 m buckets for crash checks
+export const CHUNK_SIZE = 50;
+export const TREE_CELL = 5; // trees are also filed in 5 m squares of the world for crash checks
+export const treeCell = (i, j) => i * 100003 + j; // the key of square (i, j)
 
 const TRUNK_COLOURS = [0xe6e0d3, 0xd7cdb9, 0xc7baa1, 0xece7dc];
 const CANOPY_COLOURS = [0x4e5f35, 0x5a6b3d, 0x46552f, 0x617043];
@@ -19,23 +20,29 @@ const LOG_COLOURS = [0x5a4a32, 0x4e5a30, 0x655238]; // dead wood, some of it mos
 
 // Plants are placed at a distance s along the trail and an offset square to it. On the inside
 // of a bend a long offset can reach back toward the trail, so every spot is checked against
-// the whole trail. Returns { chunks: { [chunkIndex]: lists }, treeBuckets }.
+// the whole trail. On the mountain each trail plants only where it is the nearest trail, so where
+// trails come close the forest isn't doubled, and nothing grows on any trail.
+// Returns { chunks: { [chunkKey]: lists }, treeBuckets }.
 export function planForest(trail, random) {
-  const { halfWidth, length } = trail;
+  const { halfWidth, length } = trail, world = trail.world;
   const chunks = {}, treeBuckets = {};
   // World spot for (s, off), or null if it is within `gap` of the trail edge anywhere.
-  // A spot on a trailhead clearing is marked `cleared`: the plant is still worked out (using
-  // the same random numbers, so every other plant stays where it was) but then thrown away.
+  // A spot on a clearing, or nearer another trail, is marked `cleared`: the plant is still worked
+  // out (using the same random numbers, so every other plant stays where it was) but then thrown away.
   const place = (s, off, gap) => {
     const p = trail.pointAt(s, off), at = trail.locate(p.x, p.z);
     if (Math.abs(at.off) < halfWidth(at.s) + gap) return null;
-    const cleared = !!trail.trailhead && trail.trailhead.keepClear(p.x, p.z);
-    return { x: p.x, z: p.z, s: at.s, y: trail.groundAt(p.x, p.z), cleared };
+    if (!world) return { x: p.x, z: p.z, s: at.s, y: trail.groundAt(p.x, p.z), cleared: !!trail.trailhead && trail.trailhead.keepClear(p.x, p.z) };
+    const here = world.sample(p.x, p.z), nearest = here.near[0];
+    const cleared = world.keepClear(p.x, p.z) || (nearest && nearest.trail.id !== trail.id) || here.near.some(n => n.past < gap);
+    return { x: p.x, z: p.z, s: at.s, y: here.height, cleared };
   };
+  // On the mountain, every trail gets as much forest per metre as Flow Monster (1297 m).
+  const per = n => (world ? Math.round(n * length / 1297) : n);
   const emptyLists = () => ({ trunks: [], canopy: [], fernTrunks: [], fernCrowns: [], bushes: [], rocks: [], groundFerns: [], logs: [] });
   const chunk = spot => {
     if (spot.cleared) return emptyLists(); // thrown away
-    const k = Math.floor(spot.s / CHUNK_LENGTH);
+    const k = Math.floor(spot.x / CHUNK_SIZE) + ',' + Math.floor(spot.z / CHUNK_SIZE);
     return chunks[k] || (chunks[k] = emptyLists());
   };
 
@@ -51,7 +58,7 @@ export function planForest(trail, random) {
         sx: 2.6 + random() * 3.4, sy: 1.2 + random() * 1.3, sz: 2.6 + random() * 3.4, ry: random() * 6, c: pickFrom(random, CANOPY_COLOURS) });
     }
     if (spot.cleared) return;
-    const bucket = Math.floor(spot.s / TREE_BUCKET_LENGTH);
+    const bucket = treeCell(Math.floor(x / TREE_CELL), Math.floor(z / TREE_CELL));
     (treeBuckets[bucket] || (treeBuckets[bucket] = [])).push({ x, z, r });
   };
 
@@ -64,7 +71,7 @@ export function planForest(trail, random) {
     }
   }
   // Tree ferns
-  for (let n = 0; n < 2100; n++) {
+  for (let n = 0, count = per(2100); n < count; n++) {
     const s = -10 + random() * (length + 80), side = random() < 0.5 ? -1 : 1;
     const spot = place(s, side * (halfWidth(s) + 0.5 + Math.pow(random(), 1.4) * 30), 0.4);
     if (!spot) continue;
@@ -74,7 +81,7 @@ export function planForest(trail, random) {
     c.fernCrowns.push({ x, y: y + H + 0.05, z, sx: w, sy: 0.8 + random() * 0.4, sz: w, ry: random() * 6, rx: (random() - 0.5) * 0.2, c: pickFrom(random, FERN_COLOURS) });
   }
   // Undergrowth
-  for (let n = 0; n < 1500; n++) {
+  for (let n = 0, count = per(1500); n < count; n++) {
     const s = -10 + random() * (length + 80), side = random() < 0.5 ? -1 : 1;
     const spot = place(s, side * (halfWidth(s) + 3 + Math.pow(random(), 1.1) * 45), 2.5);
     if (!spot) continue;
@@ -82,7 +89,7 @@ export function planForest(trail, random) {
     c.bushes.push({ x: spot.x, y: spot.y + 0.1, z: spot.z, sx: w, sy: 0.45 + random() * 0.7, sz: w * (0.8 + random() * 0.4), ry: random() * 6, c: pickFrom(random, BUSH_COLOURS) });
   }
   // Rocks off the trail only, thicker beside the rocky sections
-  for (let n = 0; n < 800; n++) {
+  for (let n = 0, count = per(800); n < count; n++) {
     const s = -5 + random() * (length + 40);
     const rocky = trail.scenery.rocky.some(r => s > r[0] && s < r[1]);
     if (!rocky && random() < 0.35) continue;
@@ -99,21 +106,22 @@ export function planForest(trail, random) {
     for (let s = -100; s < -10; s += 0.55 + around() * 1.0) {
       for (const side of [-1, 1]) {
         // the trail's line carries on uphill of the clearing only on the map, so plant on it too
-        const p = trail.pointAt(s, side * Math.pow(around(), 1.2) * 70);
-        gum({ x: p.x, z: p.z, s: trail.locate(p.x, p.z).s, y: trail.groundAt(p.x, p.z), cleared: trail.trailhead.keepClear(p.x, p.z) }, around);
+        const off = side * Math.pow(around(), 1.2) * 70, p = trail.pointAt(s, off);
+        if (world) gum(place(s, off, -Infinity), around); // (on the mountain, place() decides what's cleared)
+        else gum({ x: p.x, z: p.z, s: trail.locate(p.x, p.z).s, y: trail.groundAt(p.x, p.z), cleared: trail.trailhead.keepClear(p.x, p.z) }, around);
       }
     }
   }
   // Ground ferns and fallen mossy logs. Scenery only (you ride through ferns; logs lie
   // clear of the trail). Their own random sequence, so nothing else moves.
   const extra = makeRandom(trail.seed + 3);
-  for (let n = 0; n < 2600; n++) {
+  for (let n = 0, count = per(2600); n < count; n++) {
     const s = -10 + extra() * (length + 80), side = extra() < 0.5 ? -1 : 1;
     const spot = place(s, side * (halfWidth(s) + 0.6 + Math.pow(extra(), 1.3) * 28), 0.5);
     const w = 0.35 + extra() * 0.5, ry = extra() * 6, c = pickFrom(extra, GROUND_FERN_COLOURS);
     if (spot) chunk(spot).groundFerns.push({ x: spot.x, y: spot.y - 0.05, z: spot.z, sx: w, sy: w * 0.8, sz: w, ry, c });
   }
-  for (let n = 0; n < 260; n++) {
+  for (let n = 0, count = per(260); n < count; n++) {
     const s = -10 + extra() * (length + 80), side = extra() < 0.5 ? -1 : 1;
     const off = side * (halfWidth(s) + 3 + extra() * 35), r = 0.18 + extra() * 0.25, len = 3 + extra() * 7, yaw = extra() * Math.PI;
     const c = pickFrom(extra, LOG_COLOURS);
@@ -122,7 +130,8 @@ export function planForest(trail, random) {
     // both ends must be clear of the trail too, and the log lies along the ground
     const ex = Math.sin(yaw) * len / 2, ez = Math.cos(yaw) * len / 2;
     const ends = [[mid.x - ex, mid.z - ez], [mid.x + ex, mid.z + ez]];
-    if (ends.some(([x, z]) => { const at = trail.locate(x, z); return Math.abs(at.off) < halfWidth(at.s) + 2 || (trail.trailhead && trail.trailhead.keepClear(x, z)); })) continue;
+    if (ends.some(([x, z]) => { const at = trail.locate(x, z); return Math.abs(at.off) < halfWidth(at.s) + 2 || (world ? world.keepClear(x, z) || world.near(x, z).some(n => n.past < 2) : trail.trailhead && trail.trailhead.keepClear(x, z)); })) continue;
+    if (mid.cleared) continue;
     const [a, b] = ends.map(([x, z]) => new THREE.Vector3(x, trail.groundAt(x, z) + r * 0.6, z));
     const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
     const centre = a.clone().add(b).multiplyScalar(0.5);
@@ -199,7 +208,16 @@ function instanced(scene, geometry, material, list, castShadow) {
   return mesh;
 }
 
-export function buildForest(scene, plan) {
+// plans: one forest plan, or a list of them (one per trail on the mountain).
+export function buildForest(scene, plans) {
+  // every plan's plants, square by square
+  const plan = { chunks: {} };
+  for (const p of [].concat(plans)) {
+    for (const [k, lists] of Object.entries(p.chunks)) {
+      const into = plan.chunks[k] || (plan.chunks[k] = {});
+      for (const [kind, list] of Object.entries(lists)) (into[kind] || (into[kind] = [])).push(...list);
+    }
+  }
   const white = () => new THREE.MeshLambertMaterial({ color: 0xffffff }); // instance colours tint it
   const shapes = {
     trunks: [new THREE.CylinderGeometry(0.6, 1, 1, 9), new THREE.MeshLambertMaterial({ color: 0xffffff, map: barkTexture() }), true],
@@ -212,18 +230,34 @@ export function buildForest(scene, plan) {
     rocks: [new THREE.DodecahedronGeometry(1, 0), white(), false],
   };
   const chunks = Object.keys(plan.chunks).map(k => ({
-    start: +k * CHUNK_LENGTH,
+    box: boxAround(plan.chunks[k].trunks.concat(plan.chunks[k].fernTrunks, plan.chunks[k].bushes)),
     meshes: Object.entries(shapes)
       .map(([kind, [geometry, material, cast]]) => instanced(scene, geometry, material, plan.chunks[k][kind], cast))
       .filter(Boolean),
   }));
 
-  // Draw only the forest from 60 m behind to 210 m ahead of distance s.
-  function showNear(s) {
+  // Draw only the forest near the rider at (x, z), heading h: squares in a band from 60 m behind
+  // to 170 m ahead and 60 m either side (the mist hides most of what's further), as the forest
+  // was drawn along a single trail.
+  const halfSquare = CHUNK_SIZE * Math.SQRT1_2;
+  function showNear(x, z, h) {
+    const fx = Math.sin(h), fz = -Math.cos(h);
     for (const c of chunks) {
-      const visible = c.start + CHUNK_LENGTH > s - 60 && c.start < s + 210;
+      const cx = (c.box.minX + c.box.maxX) / 2 - x, cz = (c.box.minZ + c.box.maxZ) / 2 - z;
+      const ahead = cx * fx + cz * fz, side = Math.abs(cx * -fz + cz * fx);
+      const visible = ahead > -60 - halfSquare && ahead < 170 + halfSquare && side < 60 + halfSquare;
       for (const m of c.meshes) m.visible = visible;
     }
   }
   return { showNear };
+}
+
+// The smallest box (in x and z) round a list of plants.
+function boxAround(list) {
+  const box = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+  for (const it of list) {
+    box.minX = Math.min(box.minX, it.x); box.maxX = Math.max(box.maxX, it.x);
+    box.minZ = Math.min(box.minZ, it.z); box.maxZ = Math.max(box.maxZ, it.z);
+  }
+  return box;
 }

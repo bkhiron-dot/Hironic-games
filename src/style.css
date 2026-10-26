@@ -74,6 +74,14 @@ body{background:var(--forest);color:var(--ink);font-family:var(--body);padding-l
 .hs-tab{appearance:none;border:1px solid #2c3a30;background:transparent;color:var(--ink-dim);font:400 9px/1.2 "Press Start 2P",ui-monospace,monospace;padding:7px 2px;border-radius:3px;cursor:pointer}
 .hs-tab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#1a0d06}
 .hs-tab:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.hs-trails{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.hs-trail{appearance:none;border:1px solid #2c3a30;background:transparent;color:var(--ink-dim);font:400 9px/1.2 "Press Start 2P",ui-monospace,monospace;padding:8px 2px;border-radius:3px;cursor:pointer}
+.hs-trail[aria-selected="true"]{color:#f3f1ea}
+.hs-trail.green[aria-selected="true"]{background:#3f9a4a;border-color:#3f9a4a}
+.hs-trail.blue[aria-selected="true"]{background:#2f6fc0;border-color:#2f6fc0}
+.hs-trail.black[aria-selected="true"]{background:#1b1b1b;border-color:#f3f1ea}
+.hs-trail:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.hs-trail-name{font:400 12px/1.2 var(--body);color:var(--ink);text-align:center}
 .hs-table{display:grid;grid-template-columns:auto 1fr auto;column-gap:14px;row-gap:1px;font:400 22px/1.05 "VT323",ui-monospace,monospace;font-variant-numeric:tabular-nums}
 .hs-row{display:contents}
 .hs-row span{padding:1px 0;color:#9fe3b0}

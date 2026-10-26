@@ -1,14 +1,13 @@
 // Hardline MTB: builds the world, wires the parts together and runs the frame loop.
 import './style.css';
 import { makeRandom } from './util.js';
-import { FLOW_MONSTER, TRAILS } from './trails/index.js';
+import { WORLD } from './trails/index.js';
 import { MAYDENA } from './parks.js';
 import { channelOf, versionLabel } from './version.js';
-import { withTrailhead } from './trailhead.js';
 import { createScene, buildMountains, followWithSun } from './scene.js';
 import { buildTerrain } from './terrain.js';
 import { planForest, buildForest } from './forest.js';
-import { buildMarkers } from './markers.js';
+import { buildMarkers, buildClearings } from './markers.js';
 import { createKit, createBike, updateCranks, spinWheels } from './bike.js';
 import { createRider, updateLegs } from './rider.js';
 import { createDirt } from './dirt.js';
@@ -32,30 +31,34 @@ if (coarse) {
 
 const { renderer, scene, camera, sun } = createScene(document.getElementById('game'));
 
-// The world, built in v1's order. Terrain colours, forest and mountains share one
-// random sequence, so the order decides where every tree grows.
-// One trail at a time, with the trailhead clearing at its top. Which one comes from the address
-// (?trail=jolly-green-giant), Flow Monster by default. Every built trail's gate is open: ride
-// through one and the game switches to that trail's world (switchTrail below).
+// The mountain: all three trails, the trailhead at the top and the finish clearing at the
+// bottom (src/world.js). Each trail's terrain colours, forest (and, for Flow Monster, the
+// mountains after it) share that trail's own random sequence, so the order decides where every
+// tree grows. You start at the drop-in of the trail in the address (?trail=jolly-green-giant),
+// Flow Monster by default, and ride out through any gate: that's the trail you're on.
+const world = WORLD;
 const params = new URLSearchParams(location.search);
-const raw = TRAILS.find(t => t.id === params.get('trail')) || FLOW_MONSTER;
-const trail = withTrailhead(raw, TRAILS.map(t => t.difficulty));
-const random = makeRandom(trail.seed);
-buildTerrain(scene, renderer, trail, random);
-const forestPlan = planForest(trail, random);
-const forest = buildForest(scene, forestPlan);
-buildMountains(scene, trail, random);
-buildMarkers(scene, trail);
+const trail = world.trail(params.get('trail')) || world.trail('flow-monster');
+const randoms = world.trails.map(t => makeRandom(t.seed));
+const terrain = buildTerrain(scene, renderer, world.trails, randoms);
+const forestPlans = world.trails.map((t, i) => planForest(t, randoms[i]));
+const forest = buildForest(scene, forestPlans);
+buildMountains(scene, world.trail('flow-monster'), randoms[world.trails.indexOf(world.trail('flow-monster'))]);
+for (const t of world.trails) buildMarkers(scene, t);
+buildClearings(scene, world);
+// every trail's trees, in one set of 5 m squares (src/forest.js)
+const treeBuckets = {};
+for (const plan of forestPlans) for (const [k, list] of Object.entries(plan.treeBuckets)) (treeBuckets[k] || (treeBuckets[k] = [])).push(...list);
 
 const kit = createKit();
 const { bike, chassis, cranks, wheels } = createBike(scene, kit);
 const { rider, upper, legs } = createRider(chassis, kit);
 const dirt = createDirt(scene, camera);
-const tracks = createTracks(scene, trail);
+const tracks = createTracks(scene, world);
 const b = createBikeState();
-const chaseCamera = createChaseCamera(camera, trail, reduceMotion);
+const chaseCamera = createChaseCamera(camera, world, reduceMotion);
 const scores = createScoreStore(SCORES_KEY);
-const hud = createHud({ scores, trail, coarse });
+const hud = createHud({ scores, trail, trails: world.trails, coarse });
 
 let run = null;
 const keys = createInput({
@@ -63,17 +66,12 @@ const keys = createInput({
   onEndRun: () => run.endRun('restart'),
   onStart: () => run.startRun(run.state === 'done' ? 'gate' : 'trailhead'), // Enter: drop in, or ride again
 });
-// Riding out through another trail's gate: fade out, remember the speed, and load that trail's
-// world. It carries on from just above its own gate (see `arrived` below).
-const SWITCH_KEY = 'hardline-mtb-switch';
-function switchTrail(gate, speed) {
-  const next = TRAILS.find(t => t.difficulty === gate.difficulty);
-  try { sessionStorage.setItem(SWITCH_KEY, JSON.stringify({ trail: next.id, speed, at: Date.now() })); } catch { /* no storage: start at rest */ }
-  document.getElementById('fade').classList.add('show');
-  hud.toast(next.name);
-  setTimeout(() => { const url = new URL(location.href); url.searchParams.set('trail', next.id); location.replace(url); }, 450);
+// Through another trail's gate: you're on that trail now (its name, its high scores).
+function trailChanged(t) {
+  hud.setTrail(t);
+  hud.toast(t.name);
 }
-run = createRun({ b, keys, trail, scene, chassis, rider, treeBuckets: forestPlan.treeBuckets, hud, scores, chaseCamera, effects: dirt, switchTrail });
+run = createRun({ b, keys, world, trail, scene, chassis, rider, treeBuckets, hud, scores, chaseCamera, effects: dirt, onTrailChange: trailChanged });
 // Start screen: the park and which version this is (the live game, or the test version on a preview).
 document.getElementById('parkLine').textContent = MAYDENA.name + ', ' + MAYDENA.place.split(',')[0];
 document.getElementById('versionLine').textContent = versionLabel(channelOf(location));
@@ -117,21 +115,15 @@ function frame(now) {
 
   chaseCamera.update(dt, b, run.state, menuTime, rider.position);
   followWithSun(sun, b.x, b.y, b.z);
-  forest.showNear(b.s);
+  forest.showNear(b.x, b.z, b.h);
+  terrain.showNear(camera.position.x, camera.position.z);
   hud.update(run.runTime, b);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
 
 // Adding ?debug to the address hands the game's state to testing tools (screenshots, tuning).
-if (new URLSearchParams(location.search).has('debug')) window.hardline = { b, keys, run, trail, dirt, tracks, chaseCamera, camera };
+if (new URLSearchParams(location.search).has('debug')) window.hardline = { b, keys, run, world, dirt, tracks, chaseCamera, camera, renderer, scene };
 
 run.resetRun(); // the start screen's view: at the drop-in
-// Just switched here through a gate (within the last 10 s): carry straight on, no start screen.
-let arrived = null;
-try { arrived = JSON.parse(sessionStorage.getItem(SWITCH_KEY)); sessionStorage.removeItem(SWITCH_KEY); } catch { /* none */ }
-if (arrived && arrived.trail === trail.id && Date.now() - arrived.at < 10000) {
-  run.startRun('switched', Math.max(0, Math.min(25, arrived.speed || 0)));
-  hud.toast(trail.name);
-}
 requestAnimationFrame(frame);

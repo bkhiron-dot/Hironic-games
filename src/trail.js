@@ -13,7 +13,13 @@
 //  - further out: the hill itself, which depends only on world position, so the inside of
 //    a tight bend can never become a cliff. Each jump's drop is built into the hill as a
 //    gentle terrace, so trail and hill stay level with each other.
-import { clamp, smoothstep } from './util.js';
+//
+// A trail on the shared mountain (hill: { mountain: true }, see src/world.js) follows the
+// mountain's hill (Flow Monster's) instead of a grade of its own. It can't lower the whole hill
+// the way a trail on its own does, so the height each jump drops is paid back on the stretches
+// between jumps (they are a little flatter than the hill), bringing the trail back up to the
+// hillside. Its ends are eased to the levels of the clearings it starts and finishes in.
+import { clamp, smoothstep, movingAverage, tableOf } from './util.js';
 import { resolveJump, jumpProfile, SHAPE_KEYS } from './jumps.js';
 import { resolveRollers, rollerProfile, atCrest } from './rollers.js';
 import { createPath } from './path.js';
@@ -33,12 +39,20 @@ const BERM_ADJUST_FADE = 5;       // a berm adjustment blends in and out over th
 const BERM_MAX_PER_WIDTH = 0.85;  // a berm wall is at most 0.85 x the half width high, so on narrow
                                   // sections it is never steeper than about 0.85 m per 0.5 m at the edge
 const PATH_MARGIN = 120;          // the path is measured this far beyond each end (m)
+const PAYBACK_BEFORE = 15;        // on the mountain, jumps' drops are paid back between jumps: not on a jump, nor in the 15 m before its kicker,
+const PAYBACK_AFTER = 0.5;        // nor before halfway down its landing (the steep part)
+const GRADING_EASE = 120;           // a graded mountain trail follows the plain mountain this near its clearings (m)
+const LEVEL_EASE = 50;            // a mountain trail eases to its clearings' levels over this (m)
 
 const waveList = list => (list || []).map(w => ({ amp: w.amp, period: w.period, phase: w.phase || 0 }));
 const sumWaves = (ws, t) => { let v = 0; for (const w of ws) v += w.amp * Math.sin(t / w.period + w.phase); return v; };
 
-export function defineTrail(data) {
+// options (trails on the shared mountain, from src/world.js): mountain = { height(d, x) }, the
+// shared hill; startLevel / finishLevel: ground height of the clearings at each end.
+export function defineTrail(data, { mountain, startLevel, finishLevel } = {}) {
   checkTrail(data);
+  const onMountain = !!(data.hill && data.hill.mountain);
+  if (onMountain && !mountain) throw new Error(`Trail "${data.id}" is on the shared mountain: build it with createWorld() (src/world.js)`);
   const { length, splits, start } = data;
   const path = createPath(data.centreline, -PATH_MARGIN, length + PATH_MARGIN * 2);
   checkBends(data, path);
@@ -58,16 +72,48 @@ export function defineTrail(data) {
   // How much lower the trail is after jump j, ramping in across the jump (0 before it).
   const terrace = (j, s) => (j.knuck - j.drop) * smoothstep((s - (j.s - j.kick)) / (j.end - (j.s - j.kick)));
 
-  // The hill, at downhill distance d: grade, gentle waves, steeper chutes, and jump terraces.
+  // The hill, at downhill distance d: grade, gentle waves, steeper chutes (or the shared
+  // mountain), and how far this trail sits below it (jump terraces, run-outs, clearing levels).
   function hillBase(d) {
+    if (onMountain) return mountain.height(d, path.cx(d));
     let h = data.hill.grade * d + sumWaves(hillWaves, d);
     for (const c of chutes) h += c.grade * clamp(d - c.from, 0, c.to - c.from);
     return h;
   }
   function hillHeight(d) {
+    if (onMountain) return hillBase(d) + offsetAt(path.pathAt(d));
     let h = hillBase(d);
     if (jumps.length) { const s = path.pathAt(d); for (const j of jumps) h += terrace(j, s); }
     return h;
+  }
+
+  // On the mountain a trail can be graded (hill.smooth = W): cut into the hill where it is
+  // steeper and built up where it is flatter, so the line follows the mountain averaged over W m
+  // either way along the trail. That evens out the steep bits, like switchback corners.
+  const mountainAlong = onMountain ? tableOf(s => hillBase(path.downhillAt(s)), -PATH_MARGIN, length + PATH_MARGIN, 0.25) : () => 0;
+  const smoothed = onMountain && data.hill.smooth ? movingAverage(mountainAlong, -PATH_MARGIN, length + PATH_MARGIN, data.hill.smooth) : null;
+  // (eased out over the GRADING_EASE m nearest each clearing, where the trails run side by side
+  // into their gates: there each follows the mountain itself, so they meet it at the same level)
+  const gradingShare = s => smoothstep((s - data.start.gate) / GRADING_EASE) * smoothstep((length - s) / GRADING_EASE);
+  const grading = s => (smoothed ? (smoothed(s) - mountainAlong(s)) * gradingShare(s) : 0);
+
+  // On the mountain: how far the riding line sits above (+) or below (-) the mountain at s,
+  // leaving out the features' own shapes: its grading; each jump's drop, ramping in across it
+  // (as a terrace) and paid back between jumps; and near each end, the ease to its clearing's level.
+  const paybacks = onMountain ? planPayback(jumps, data.start.gate + LEVEL_EASE, length - LEVEL_EASE) : [];
+  const payback = s => { let h = 0; for (const p of paybacks) h += p.by * smoothstep((s - p.from) / (p.to - p.from)); return h; };
+  function offsetAt(s) {
+    let h = 0;
+    for (const j of jumps) h += terrace(j, s);
+    return h + grading(s) + payback(s) + levelEase(s);
+  }
+  // The riding line's height at a clearing (ground = line minus the dish), eased in and out.
+  const rawLine = s => mountainAlong(s) + grading(s) + jumpHeight(s) + payback(s);
+  const startShift = onMountain && startLevel !== undefined ? startLevel + DISH_DEPTH - rawLine(data.start.gate) : 0;
+  const finishShift = onMountain && finishLevel !== undefined ? finishLevel + DISH_DEPTH - rawLine(data.length) : 0;
+  function levelEase(s) {
+    return startShift * (1 - smoothstep((s - data.start.gate) / LEVEL_EASE))
+      + finishShift * smoothstep((s - (data.length - LEVEL_EASE)) / LEVEL_EASE);
   }
 
   // Height the jumps and rollers add along the trail (kickers, gaps, landings and their drops).
@@ -85,8 +131,11 @@ export function defineTrail(data) {
     return h / 0.5;
   }
 
-  // Height of the riding line on the centreline, before the dish and berms.
-  const lineHeight = s => hillBase(path.downhillAt(s)) + jumpHeight(s);
+  // Height of the riding line on the centreline, before the dish and berms. On the mountain the
+  // jumps' drops are paid back and the ends meet the clearings.
+  const lineHeight = onMountain
+    ? s => rawLine(s) + levelEase(s)
+    : s => hillBase(path.downhillAt(s)) + jumpHeight(s);
 
   // If s is on a kicker, returns the jump and u (metres before the lip, negative). Otherwise null.
   function kickerAt(s) {
@@ -162,25 +211,40 @@ export function defineTrail(data) {
     return Math.pow(eased, 1.25) * BANK_RISE;
   }
 
-  // Ground height at path position (s, off), which is world point (x, z).
-  function surface(s, off, x, z) {
+  // On the mountain a trail traversing across the hill is benched into it: beside the trail the
+  // ground keeps the hill's tilt across the trail (rising on the uphill side, falling on the
+  // downhill side) under its banks. tilt(s): the hill's rise per metre to the trail's right.
+  const tilt = onMountain ? movingAverage(s => {
+    const a = path.pointAt(s, -1), b = path.pointAt(s, 1);
+    return (mountain.height(-b.z, b.x) - mountain.height(-a.z, a.x)) / 2;
+  }, -PATH_MARGIN, length + PATH_MARGIN, 1) : () => 0;
+
+  // The ground beside the trail at path position (s, off): the trail's own shape (dish, berms,
+  // banks) and how far it has blended into the hill (toHill, 0 near the trail, 1 from 20 m past
+  // its edge). `near` is only worked out while toHill < 1.
+  function corridor(s, off) {
     const a = Math.abs(off), w = halfWidth(s);
     const toHill = smoothstep((a - w - BLEND_START) / (BLEND_END - BLEND_START));
-    let near = 0, far = 0;
+    let near = 0;
     if (toHill < 1) {
       near = lineHeight(s) + bermHeight(s, off, w);
       if (a > w) {
         // off the trail the banks rise away, with gentle lumps
         const e = a - w;
-        near += bankRise(e) + 0.25 * Math.sin(s * 0.31 + off * 0.7) * Math.min(1, e / 2);
+        near += bankRise(e) + 0.25 * Math.sin(s * 0.31 + off * 0.7) * Math.min(1, e / 2) + tilt(s) * Math.sign(off) * e;
       } else {
         near -= DISH_DEPTH * (1 - (a / w) * (a / w));
       }
     }
-    if (toHill > 0) {
-      const d = -z, e = Math.max(0, a - bankWidth);
-      far = hillHeight(d) + bankRise(e) + 0.25 * Math.sin(d * 0.31 + x * 0.7);
-    }
+    return { near, toHill };
+  }
+  // The open hillside at world point (x, z), `e` metres past the trail's typical edge.
+  const hillside = (x, z, e, hill) => hill + bankRise(Math.max(0, e)) + 0.25 * Math.sin(-z * 0.31 + x * 0.7);
+
+  // Ground height at path position (s, off), which is world point (x, z).
+  function surface(s, off, x, z) {
+    const { near, toHill } = corridor(s, off);
+    const far = toHill > 0 ? hillside(x, z, Math.abs(off) - bankWidth, hillHeight(-z)) : 0;
     return near + (far - near) * toHill;
   }
 
@@ -198,15 +262,42 @@ export function defineTrail(data) {
 
   return {
     id: data.id, name: data.name, difficulty: data.difficulty, length, seed: data.seed, splits, start,
-    grade: data.hill.grade, // the hill's overall grade (the jump simulator rides jumps on it)
+    grade: data.hill.grade, // the hill's overall grade (the jump simulator rides jumps on it; not on the mountain)
+    onMountain, bankWidth, corridor, hillside, bankRise,
+    // on the mountain: how far the hillside around the trail sits above the mountain at s
+    mountainOffset: s => (onMountain ? offsetAt(s) : 0),
     scenery: { rocky: [], ...data.scenery }, jumps, rollers, berms,
     halfWidth, curvature, hillHeight, jumpHeight, lineHeight, kickerAt, popAt, onRollers, rollerSlope, jumpZone,
     bermAmount, bermHeight, ground, groundAt,
     // on the riding surface (full grip, low drag)? (x, z) is the same point in the world
     onTrail: (s, off) => Math.abs(off) <= halfWidth(s) + 0.3,
     pointAt: path.pointAt, headingAt: path.headingAt, locate: path.locate,
-    downhillAt: path.downhillAt, pathAt: path.pathAt,
+    downhillAt: path.downhillAt, pathAt: path.pathAt, cx: path.cx,
   };
+}
+
+// Where a mountain trail pays back its jumps' drops: on the stretches between jumps (from halfway
+// down a landing to 15 m before the next kicker). Each jump's drop is shared by the two stretches
+// before it (1/6, 1/3: so the trail rises a little above the hillside before a big drop) and the
+// two after it (1/3, 1/6), so the trail is never far above or below the hillside: about a third of
+// a jump's drop at most. Returns a list of { from, to, by }: the line rises `by` metres from
+// `from` to `to`.
+const PAYBACK_SHARES = [[-1, 1 / 6], [0, 1 / 3], [1, 1 / 3], [2, 1 / 6]]; // stretch (0 = just before the jump), share
+function planPayback(jumps, first, last) {
+  const stretches = [];
+  let from = first;
+  for (const j of jumps) {
+    stretches.push({ from, to: j.s - j.kick - PAYBACK_BEFORE, by: 0 });
+    from = j.s + j.gap + PAYBACK_AFTER * j.land;
+  }
+  stretches.push({ from, to: last, by: 0 });
+  const usable = i => i >= 0 && i < stretches.length && stretches[i].to > stretches[i].from;
+  jumps.forEach((j, i) => {
+    const drop = j.drop - j.knuck, shares = PAYBACK_SHARES.filter(([k]) => usable(i + k));
+    const total = shares.reduce((sum, [, w]) => sum + w, 0);
+    for (const [k, w] of shares) stretches[i + k].by += drop * w / total;
+  });
+  return stretches.filter(p => p.to > p.from);
 }
 
 /* ---------- Checking trail data ----------
@@ -230,7 +321,25 @@ function checkTrail(data) {
   if (!DIFFICULTIES.includes(data.difficulty)) fail(`difficulty must be one of ${DIFFICULTIES.join(', ')}`);
   if (!isNumber(data.length) || data.length <= 0) fail('length must be a positive number of metres');
   if (!Number.isInteger(data.seed)) fail('seed must be a whole number');
-  checkWaves(data.centreline, 'centreline');
+  const line = data.centreline;
+  if (Array.isArray(line)) checkWaves(line, 'centreline');
+  else {
+    if (!line || typeof line !== 'object') fail('centreline must be a list of waves, { x0, heading, turns } or { x0, shifts, waves }');
+    if (line.x0 !== undefined && !isNumber(line.x0)) fail('centreline x0 must be a number');
+    checkWaves(line.waves || [], 'centreline');
+    (line.waves || []).forEach((wv, i) => {
+      if ((wv.from !== undefined || wv.to !== undefined) && !(isNumber(wv.fade) && wv.fade > 0)) fail(`centreline wave ${i + 1} fades in or out, so it needs a fade length`);
+    });
+    if (line.turns) {
+      if (!isNumber(line.heading)) fail('a centreline with turns needs a starting heading (degrees)');
+      line.turns.forEach((tn, i) => {
+        if (!isNumber(tn.at) || !isNumber(tn.heading) || Math.abs(tn.heading) >= 85 || !(isNumber(tn.over) && tn.over > 0)) fail(`centreline turn ${i + 1} needs at, a heading under 85 degrees and a positive over`);
+      });
+    }
+    (line.shifts || []).forEach((sh, i) => {
+      if (!isNumber(sh.at) || !isNumber(sh.by) || !(isNumber(sh.over) && sh.over > 0)) fail(`centreline shift ${i + 1} needs at, by and a positive over`);
+    });
+  }
 
   const w = data.width || {};
   if (!isNumber(w.base) || !isNumber(w.min) || !isNumber(w.max)) fail('width needs base, min and max');
@@ -238,14 +347,18 @@ function checkTrail(data) {
   checkWaves(w.waves || [], 'width');
 
   const h = data.hill || {};
-  if (!isNumber(h.grade)) fail('hill needs a grade, like -0.2 (downhill)');
+  if (h.mountain) {
+    if (h.grade !== undefined || h.chutes) fail('a trail on the mountain follows its hill: no grade or chutes of its own');
+    if (h.smooth !== undefined && !(Number.isInteger(h.smooth) && h.smooth > 0)) fail('hill smooth must be a whole number of metres');
+  }
+  else if (!isNumber(h.grade)) fail('hill needs a grade, like -0.2 (downhill)');
   checkWaves(h.waves || [], 'hill');
   (h.chutes || []).forEach(c => {
     if (!isNumber(c.from) || !isNumber(c.to) || !isNumber(c.grade) || c.to <= c.from) fail(`chute needs from < to and a grade (got ${JSON.stringify(c)})`);
   });
 
   const st = data.start || {};
-  if (!isNumber(st.spawn) || !isNumber(st.gate) || !(st.spawn >= 0 && st.spawn < st.gate)) fail('start needs spawn and gate, with spawn before the gate');
+  if (!isNumber(st.spawn) || !isNumber(st.gate) || !(st.spawn >= -30 && st.spawn < st.gate)) fail('start needs spawn and gate, with spawn before the gate');
 
   const sp = data.splits;
   if (!Array.isArray(sp) || sp.length !== SPLIT_COUNT) fail(`needs exactly ${SPLIT_COUNT} splits (3 splits and the finish)`);
