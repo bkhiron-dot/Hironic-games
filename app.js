@@ -67,7 +67,7 @@ async function landingScreen(me) {
   const profiles = await listProfiles();
   app.innerHTML = `<main class="center landing">
     <div class="hero-title">🎮</div>
-    <h1>Hironic Games</h1>
+    <h1>Hironic games dev platform</h1>
     <p class="tagline">Make games. Test them. Play everyone's!</p>
     <h2>Who's playing?</h2>
     <div class="profile-grid">
