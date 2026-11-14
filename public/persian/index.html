@@ -1,0 +1,1592 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Lanterns of Isfahan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Alegreya+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: the 3D city fills the screen; a manuscript-style panel rises from the bottom
+   for story and puzzles; lantern progress sits at the top. One committed dusk look. */
+:root {
+  --night: #16122b;
+  --lapis: #1f4f8f;
+  --lapis-deep: #143766;
+  --turq: #2b9c98;
+  --saffron: #e2a51c;
+  --saffron-deep: #a8740a;
+  --parch: #fbf4e4;
+  --parch-2: #efe2c4;
+  --ink: #2a1d2e;
+  --ink-soft: #5d4b57;
+  --rose: #a33d2c;
+  --leaf: #2f6b33;
+  --on-dark: #fbeecb;
+  --display: 'Marcellus', 'Palatino Linotype', Palatino, Georgia, serif;
+  --body: 'Alegreya Sans', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --fs: 20px;
+  color-scheme: light;
+}
+html.big { --fs: 24px; }
+html { font-size: var(--fs); }
+html, body { height: 100%; margin: 0; overflow: hidden; }
+body { background: var(--night); color: var(--ink); font-family: var(--body); line-height: 1.45; -webkit-text-size-adjust: 100%; }
+body.no3d { background: linear-gradient(#1b1840, #7a4c78 45%, #e58a52 60%, #6a4a5a); }
+button { font-family: inherit; touch-action: manipulation; cursor: pointer; }
+[hidden] { display: none !important; }
+
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+/* Top bar: five lantern pips and two settings buttons */
+.hud {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 5;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
+  display: flex; justify-content: space-between; align-items: center; gap: 10px; pointer-events: none;
+}
+.hud > * { pointer-events: auto; }
+.pips { display: flex; gap: 9px; background: rgba(22, 18, 43, .68); padding: 10px 14px; border-radius: 999px; }
+.pip { width: 15px; height: 22px; border-radius: 7px 7px 4px 4px; background: #3a3046; border: 2px solid #8a7a5a; transition: all .6s; }
+.pip.lit { background: radial-gradient(circle at 50% 55%, #fff3c4, #ffb02e 60%, #c46a10); border-color: #f6d27a; box-shadow: 0 0 12px 3px rgba(255, 176, 46, .7); }
+.hud-btns { display: flex; gap: 8px; }
+.chip {
+  min-height: 48px; min-width: 48px; padding: 0 14px; border-radius: 999px;
+  border: 2px solid rgba(246, 210, 122, .75); background: rgba(22, 18, 43, .72); color: var(--on-dark);
+  font: 700 .8rem var(--body);
+}
+
+/* Place name shown on arrival */
+.place {
+  position: fixed; left: 50%; transform: translateX(-50%); z-index: 4;
+  top: calc(env(safe-area-inset-top, 0px) + 78px); width: min(92%, 560px);
+  text-align: center; color: #fff7e0; text-shadow: 0 2px 10px rgba(0, 0, 0, .9), 0 0 2px #000;
+  font-family: var(--display); font-size: 1.6rem; line-height: 1.2; pointer-events: none; transition: opacity 1s;
+}
+.place small { display: block; margin-top: 6px; font-family: var(--body); font-size: .9rem; font-weight: 500; }
+.place.fade { opacity: 0; }
+
+/* Bottom action buttons */
+.actions {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 18px) max(16px, env(safe-area-inset-left, 0px));
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.btn {
+  min-height: 60px; width: min(100%, 460px); padding: 10px 18px; border: 0; border-radius: 16px;
+  background: var(--lapis); color: #fff; font: 700 1.05rem var(--body); line-height: 1.2;
+  box-shadow: 0 4px 0 var(--lapis-deep), 0 8px 22px rgba(0, 0, 0, .35);
+}
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--lapis-deep); }
+.btn.gold { background: var(--saffron); color: #2a1a05; box-shadow: 0 4px 0 var(--saffron-deep), 0 8px 22px rgba(0, 0, 0, .3); }
+.btn.gold:active { box-shadow: 0 1px 0 var(--saffron-deep); }
+.btn.ghost { background: var(--parch); color: var(--lapis-deep); border: 2px solid var(--lapis); box-shadow: none; }
+.btn:focus-visible, .chip:focus-visible, .tile:focus-visible, .slot:focus-visible, .cell:focus-visible, .choice:focus-visible, .mcell:focus-visible { outline: 3px solid var(--saffron); outline-offset: 3px; }
+
+/* The parchment panel */
+.panel {
+  position: fixed; left: 0; right: 0; margin: 0 auto; z-index: 10; box-sizing: border-box;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  width: min(calc(100% - 28px), 620px);
+  max-height: calc(100% - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 84px);
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: var(--parch); border: 3px solid var(--saffron); border-radius: 22px;
+  box-shadow: 0 0 0 5px var(--lapis), 0 6px 18px rgba(0, 0, 0, .45);
+  padding: 20px 20px 18px; display: flex; flex-direction: column; gap: 14px;
+}
+.panel h2 { margin: 0; font: 400 1.5rem/1.15 var(--display); color: var(--lapis-deep); text-wrap: balance; }
+.eyebrow { margin: 0 0 -8px; font-size: .75rem; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-soft); font-weight: 700; }
+.say { margin: 0; font-size: 1.05rem; white-space: pre-line; }
+.riddle {
+  margin: 0; padding: 14px 16px; border-radius: 14px; background: var(--parch-2);
+  font: 400 1.15rem/1.5 var(--display); color: var(--ink); white-space: pre-line; text-align: center;
+}
+.feedback { margin: 0; min-height: 1.4em; font-weight: 700; color: var(--rose); }
+.feedback.good { color: var(--leaf); }
+.feedback:empty { display: none; }
+.hint-box { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 14px; background: #e3ecf6; }
+.hint-box p { margin: 0; }
+.hint-box p::before { content: "Hint: "; font-weight: 700; color: var(--lapis-deep); }
+.hint-box img { width: 140px; height: 140px; border-radius: 8px; display: block; margin-top: 6px; }
+/* Hint and Step back stay in view at the bottom of the panel, even when it scrolls */
+.foot { display: flex; flex-wrap: wrap; gap: 10px; position: sticky; bottom: -18px; margin: 0 -20px -18px; padding: 10px 20px 18px; background: var(--parch); border-top: 1px solid var(--parch-2); }
+.foot .btn { flex: 1 1 180px; width: auto; }
+.story p { margin: 0; font-size: 1.05rem; }
+.story { display: flex; flex-direction: column; gap: 10px; }
+.tips { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 4px; }
+
+/* Puzzle: multiple choice */
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.choice {
+  min-height: 60px; border-radius: 14px; border: 2px solid var(--lapis); background: #fff;
+  color: var(--lapis-deep); font: 700 1.05rem var(--body); padding: 8px;
+}
+.choice.wrong { border-color: #b9a9a0; color: #9a8a85; background: #f1ebe4; text-decoration: line-through; }
+.choice.right { background: var(--leaf); border-color: var(--leaf); color: #fff; }
+.choice.gone { visibility: hidden; }
+
+/* Puzzle: spelling with letter tiles */
+.slots, .tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.slot {
+  width: 2.3rem; height: 2.8rem; border: 0; border-bottom: 4px solid var(--lapis); border-radius: 8px 8px 2px 2px;
+  background: #fff; font: 700 1.5rem var(--body); color: var(--ink); padding: 0;
+}
+.slot.locked { background: #e3ecf6; color: var(--lapis-deep); }
+.slot.right { background: #dcefd9; border-color: var(--leaf); }
+.tile {
+  width: 2.8rem; height: 2.8rem; border-radius: 12px; border: 2px solid var(--saffron-deep);
+  background: linear-gradient(#fbe7b0, #f1cf73); font: 700 1.5rem var(--body); color: #3a2605; padding: 0;
+  box-shadow: 0 3px 0 var(--saffron-deep);
+}
+.tile.used { visibility: hidden; }
+.shake { animation: shake .45s; }
+@keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+
+/* Puzzle: mosaic */
+.mosaic { width: min(100%, 320px, 36vh); aspect-ratio: 1; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; background: var(--saffron-deep); padding: 3px; border-radius: 10px; box-sizing: border-box; }
+.mcell { padding: 0; border: 0; background: #173d70; overflow: hidden; }
+.mcell canvas { width: 100%; height: 100%; display: block; transition: transform .3s ease; }
+.mcell.fixed { cursor: default; }
+.mosaic.done { box-shadow: 0 0 0 4px var(--leaf); }
+
+/* Puzzle: word search */
+.wgrid { width: min(100%, 340px, 40vh); margin: 0 auto; display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+.cell {
+  aspect-ratio: 1; border-radius: 10px; border: 2px solid #d8c69d; background: #fff;
+  font: 700 1.3rem var(--body); color: var(--ink); padding: 0;
+}
+.cell.sel { background: var(--saffron); border-color: var(--saffron-deep); }
+.cell.pulse { animation: pulse 1s infinite; }
+@keyframes pulse { 50% { background: #ffe9a6; border-color: var(--saffron-deep); } }
+.cell.f0 { background: #bfe5e2; border-color: var(--turq); }
+.cell.f1 { background: #f6dc9a; border-color: var(--saffron-deep); }
+.cell.f2 { background: #f2c4b8; border-color: var(--rose); }
+.cell.f3 { background: #c9d8f0; border-color: var(--lapis); }
+.words { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; margin: 0; padding: 0; list-style: none; font-weight: 700; font-size: 1.1rem; }
+.words li.found { text-decoration: line-through; color: var(--leaf); }
+
+/* Title screen */
+.cover {
+  position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 14px;
+  padding: calc(env(safe-area-inset-top, 0px) + 20px) max(20px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 28px) max(20px, env(safe-area-inset-left, 0px));
+  background: linear-gradient(rgba(22, 18, 43, 0) 25%, rgba(22, 18, 43, .9) 75%);
+  text-align: center; color: var(--on-dark);
+}
+.cover h1 { margin: 0; font: 400 2.6rem/1.05 var(--display); color: #f6cf6a; text-shadow: 0 3px 14px rgba(0, 0, 0, .7); text-wrap: balance; }
+.cover p { margin: 0 0 8px; font-size: 1.05rem; max-width: 30em; }
+.cover .btn { max-width: 420px; }
+.cover .note { font-size: .8rem; opacity: .85; margin-top: 4px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mcell canvas, .place, .pip { transition: none; }
+  .shake, .cell.pulse { animation: none; }
+}
+</style>
+
+<canvas id="scene" aria-label="A medieval Persian city at dusk"></canvas>
+
+<div class="hud">
+  <div class="pips" id="pips" aria-label="Lanterns lit"></div>
+  <div class="hud-btns">
+    <button class="chip" id="soundBtn" aria-pressed="true">Sound on</button>
+    <button class="chip" id="textBtn" aria-label="Change text size">A+</button>
+  </div>
+</div>
+<div class="place fade" id="place" aria-live="polite"></div>
+<div class="actions" id="actions" hidden></div>
+<div class="panel" id="panel" role="dialog" aria-modal="false" hidden></div>
+
+<div class="cover" id="cover">
+  <h1>The Lanterns of Isfahan</h1>
+  <p>Isfahan, in the year 1150. Night is falling and the city’s lanterns are dark. Solve five puzzles to light them again.</p>
+  <div id="coverBtns" style="display:flex;flex-direction:column;gap:12px;width:100%;align-items:center"></div>
+  <p class="note">Best held upright. Your progress is saved on this phone.</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+
+/* =========================================================================
+   Small helpers
+   ========================================================================= */
+const $ = (s) => document.querySelector(s);
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+function button(label, cls, onClick) {
+  const b = el('button', cls, label);
+  b.type = 'button';
+  b.addEventListener('click', onClick);
+  return b;
+}
+// A seeded random sequence, so the city is the same every time it loads.
+function seeded(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function shuffle(list, rand) {
+  const a = list.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const ease = (u) => u * u * (3 - 2 * u);
+
+/* =========================================================================
+   Saved progress (kept on this phone only)
+   ========================================================================= */
+const SAVE_KEY = 'lanterns-of-isfahan';
+const game = { at: 0, solved: [false, false, false, false, false], finished: false, big: false, sound: true, mode: 'title' };
+
+function loadSave() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (s && Array.isArray(s.solved) && s.solved.length === 5) return s;
+  } catch (e) { /* no saved game */ }
+  return null;
+}
+function writeSave() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      at: game.at, solved: game.solved, finished: game.finished, big: game.big, sound: game.sound,
+    }));
+  } catch (e) { /* storage blocked: the game still plays */ }
+}
+
+/* =========================================================================
+   Sound: a soft chime when a lantern lights (only after a tap, as phones require)
+   ========================================================================= */
+let audio = null;
+function chime(big) {
+  if (!game.sound) return;
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+    const notes = big ? [523.25, 659.25, 783.99, 1046.5, 1318.5] : [659.25, 880, 987.77];
+    notes.forEach((f, i) => {
+      const o = audio.createOscillator();
+      const g = audio.createGain();
+      o.type = 'sine';
+      o.frequency.value = f;
+      const t = audio.currentTime + i * 0.17;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.16, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.8);
+      o.connect(g).connect(audio.destination);
+      o.start(t);
+      o.stop(t + 1.9);
+    });
+  } catch (e) { /* no audio available */ }
+}
+
+/* =========================================================================
+   The mosaic pattern (used by the tile puzzle and the workshop wall)
+   ========================================================================= */
+const MOSAIC_SIZE = 480;
+const MOSAIC_START = [1, 3, 2, 3, 0, 1, 2, 1, 3]; // quarter turns of each tile when scrambled
+
+function drawMosaic(g, S) {
+  const c = S / 2;
+  g.fillStyle = '#173d70';
+  g.fillRect(0, 0, S, S);
+  // Fine lattice in the background
+  g.strokeStyle = 'rgba(120, 190, 200, .35)';
+  g.lineWidth = S * 0.006;
+  for (let i = -S; i < 2 * S; i += S / 9) {
+    g.beginPath(); g.moveTo(i, 0); g.lineTo(i + S, S); g.stroke();
+    g.beginPath(); g.moveTo(i, S); g.lineTo(i + S, 0); g.stroke();
+  }
+  const disc = (x, y, r, fill, stroke) => {
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2);
+    g.fillStyle = fill; g.fill();
+    if (stroke) { g.strokeStyle = stroke; g.lineWidth = S * 0.01; g.stroke(); }
+  };
+  // Rosettes in the corners: these tell you which way each corner tile goes
+  for (const [x, y] of [[0, 0], [S, 0], [0, S], [S, S]]) {
+    disc(x, y, S * 0.2, '#e2a51c');
+    disc(x, y, S * 0.13, '#a33d2c');
+    disc(x, y, S * 0.05, '#fbf4e4');
+  }
+  // Half-moons at the middle of each edge
+  for (const [x, y] of [[c, 0], [S, c], [c, S], [0, c]]) disc(x, y, S * 0.09, '#2b9c98', '#f1c24a');
+  // The gold ring
+  g.beginPath(); g.arc(c, c, S * 0.36, 0, Math.PI * 2);
+  g.strokeStyle = '#f1c24a'; g.lineWidth = S * 0.03; g.stroke();
+  // Eight-pointed star
+  g.beginPath();
+  for (let k = 0; k < 16; k++) {
+    const r = k % 2 === 0 ? S * 0.31 : S * 0.17;
+    const a = k * Math.PI / 8 - Math.PI / 2;
+    const x = c + r * Math.cos(a), y = c + r * Math.sin(a);
+    if (k === 0) g.moveTo(x, y); else g.lineTo(x, y);
+  }
+  g.closePath();
+  g.fillStyle = '#2b9c98'; g.fill();
+  g.strokeStyle = '#f1c24a'; g.lineWidth = S * 0.012; g.stroke();
+  disc(c, c, S * 0.08, '#fbf4e4');
+  disc(c, c, S * 0.04, '#a33d2c');
+}
+
+const mosaicCanvas = document.createElement('canvas');
+mosaicCanvas.width = mosaicCanvas.height = MOSAIC_SIZE;
+drawMosaic(mosaicCanvas.getContext('2d'), MOSAIC_SIZE);
+
+// Draws the mosaic with each tile turned by the given quarter turns.
+function drawTurnedMosaic(g, S, turns) {
+  const T = S / 3, src = MOSAIC_SIZE / 3;
+  for (let i = 0; i < 9; i++) {
+    const col = i % 3, row = Math.floor(i / 3);
+    g.save();
+    g.translate(col * T + T / 2, row * T + T / 2);
+    g.rotate(turns[i] * Math.PI / 2);
+    g.drawImage(mosaicCanvas, col * src, row * src, src, src, -T / 2, -T / 2, T, T);
+    g.restore();
+  }
+}
+
+/* =========================================================================
+   Puzzle 1 and 4 style: a riddle with four answers to choose from
+   ========================================================================= */
+function choicePuzzle(cfg) {
+  return function create(ctx) {
+    const root = el('div', 'pz');
+    root.append(el('p', 'riddle', cfg.riddle));
+    const grid = el('div', 'choices');
+    root.append(grid);
+    const inst = { root, done: false };
+    const buttons = cfg.choices.map((c) => {
+      const b = button(c, 'choice', () => pick(b, c));
+      grid.append(b);
+      return b;
+    });
+    function pick(b, c) {
+      if (inst.done || b.disabled) return;
+      if (c === cfg.answer) {
+        b.classList.add('right');
+        ctx.solved();
+      } else {
+        b.classList.add('wrong');
+        b.disabled = true;
+        ctx.say(cfg.wrong);
+      }
+    }
+    inst.hints = [
+      { text: cfg.hints[0] },
+      { text: cfg.hints[1] },
+      {
+        text: cfg.hints[2],
+        act: () => {
+          // Take away two wrong answers (the ones not already tried first)
+          const wrong = buttons.filter((b, i) => cfg.choices[i] !== cfg.answer);
+          wrong.sort((a, b) => (a.disabled ? 1 : 0) - (b.disabled ? 1 : 0));
+          wrong.slice(0, 2).forEach((b) => { b.classList.add('gone'); b.disabled = true; });
+        },
+      },
+    ];
+    inst.solve = () => pick(buttons[cfg.choices.indexOf(cfg.answer)], cfg.answer);
+    return inst;
+  };
+}
+
+/* =========================================================================
+   Puzzles 2 and 4: spell a word by tapping letter tiles
+   ========================================================================= */
+function spellPuzzle(cfg) {
+  return function create(ctx) {
+    const answer = cfg.answer;
+    const n = answer.length;
+    const rand = seeded(answer.length * 97 + 13);
+    let letters;
+    do { letters = shuffle((answer + (cfg.extra || '')).split(''), rand); }
+    while (letters.slice(0, n).join('') === answer);
+
+    const root = el('div', 'pz');
+    if (cfg.riddle) root.append(el('p', 'riddle', cfg.riddle));
+    const slotRow = el('div', 'slots');
+    const tileRow = el('div', 'tiles');
+    root.append(slotRow, tileRow);
+    const inst = { root, done: false };
+
+    const tiles = letters.map((ch) => {
+      const t = { ch, used: false };
+      t.btn = button(ch, 'tile', () => place(t));
+      t.btn.setAttribute('aria-label', 'Letter ' + ch);
+      tileRow.append(t.btn);
+      return t;
+    });
+    const slots = Array.from({ length: n }, (_, i) => {
+      const s = { tile: null, locked: false };
+      s.btn = button('', 'slot', () => takeBack(s));
+      s.btn.setAttribute('aria-label', 'Letter space ' + (i + 1));
+      slotRow.append(s.btn);
+      return s;
+    });
+
+    function render() {
+      tiles.forEach((t) => t.btn.classList.toggle('used', t.used));
+      slots.forEach((s) => {
+        s.btn.textContent = s.tile ? s.tile.ch : '';
+        s.btn.classList.toggle('locked', s.locked);
+      });
+    }
+    function place(t) {
+      if (inst.done || t.used) return;
+      const s = slots.find((x) => !x.tile && !x.locked);
+      if (!s) return;
+      s.tile = t; t.used = true;
+      ctx.say('');
+      render();
+      if (slots.every((x) => x.tile)) check();
+    }
+    function takeBack(s) {
+      if (inst.done || s.locked || !s.tile) return;
+      s.tile.used = false; s.tile = null;
+      ctx.say('');
+      render();
+    }
+    function check() {
+      const word = slots.map((s) => s.tile.ch).join('');
+      if (word === answer) {
+        inst.done = true;
+        slots.forEach((s) => s.btn.classList.add('right'));
+        ctx.solved();
+      } else {
+        ctx.say('Not quite. Tap a letter in the top row to send it back.');
+        slotRow.classList.remove('shake'); void slotRow.offsetWidth; slotRow.classList.add('shake');
+      }
+    }
+    // Put the first k letters of the answer in place and lock them.
+    function reveal(k) {
+      slots.forEach((s) => { if (!s.locked && s.tile) { s.tile.used = false; s.tile = null; } });
+      for (let i = 0; i < k; i++) {
+        const s = slots[i];
+        if (s.locked) continue;
+        const t = tiles.find((x) => !x.used && x.ch === answer[i]);
+        s.tile = t; t.used = true; s.locked = true;
+      }
+      render();
+    }
+    inst.hints = [
+      { text: cfg.hints[0] },
+      { text: cfg.hints[1], act: () => reveal(1) },
+      { text: cfg.hints[2], act: () => reveal(n - 2) },
+    ];
+    inst.solve = () => { reveal(n); check(); };
+    render();
+    return inst;
+  };
+}
+
+/* =========================================================================
+   Puzzle 3: turn the mosaic tiles until the pattern is whole
+   ========================================================================= */
+function mosaicPuzzle() {
+  return function create(ctx) {
+    const root = el('div', 'pz');
+    const grid = el('div', 'mosaic');
+    root.append(grid);
+    const inst = { root, done: false };
+    const src = MOSAIC_SIZE / 3;
+    const cells = MOSAIC_START.map((start, i) => {
+      const cell = { turns: start, fixed: i === 4 };
+      cell.btn = button('', 'mcell' + (cell.fixed ? ' fixed' : ''), () => turn(cell));
+      cell.btn.setAttribute('aria-label', cell.fixed ? 'Middle tile, already in place' : 'Tile ' + (i + 1) + ', tap to turn');
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = src;
+      cv.getContext('2d').drawImage(mosaicCanvas, (i % 3) * src, Math.floor(i / 3) * src, src, src, 0, 0, src, src);
+      cell.btn.append(cv);
+      cell.canvas = cv;
+      grid.append(cell.btn);
+      return cell;
+    });
+    const show = (c) => { c.canvas.style.transform = 'rotate(' + (c.turns * 90) + 'deg)'; };
+    cells.forEach(show);
+
+    function turn(c) {
+      if (inst.done || c.fixed) return;
+      c.turns += 1;
+      show(c);
+      check();
+    }
+    function check() {
+      if (cells.every((c) => c.turns % 4 === 0)) {
+        inst.done = true;
+        setTimeout(() => grid.classList.add('done'), 300);
+        ctx.solved();
+      }
+    }
+    // Turn a tile the shortest way forward until it's right.
+    const fix = (c) => { c.turns += (4 - (c.turns % 4)) % 4; show(c); };
+    const thumb = new Image();
+    thumb.alt = 'The finished mosaic';
+    thumb.src = mosaicCanvas.toDataURL();
+    inst.hints = [
+      { text: 'Look at the gold ring. It should make one complete circle around the star.' },
+      { text: 'Here is how the finished mosaic looks. The orange flowers sit in the four corners.', image: thumb },
+      {
+        text: 'I have turned most of the tiles for you. Only two are left.',
+        act: () => { cells.filter((c) => c.turns % 4 !== 0).slice(2).forEach(fix); },
+      },
+    ];
+    inst.solve = () => { cells.forEach(fix); setTimeout(check, 350); };
+    return inst;
+  };
+}
+
+/* =========================================================================
+   Puzzle 5: find four garden words in a grid of letters
+   ========================================================================= */
+function wordSearchPuzzle() {
+  const GRID = ['ROSEKA', 'BMINTL', 'FAPDQZ', 'IHOKEN', 'GUOWAY', 'TELJAR'];
+  // Each word's first and last letter as [row, column]
+  const WORDS = [
+    { word: 'ROSE', a: [0, 0], b: [0, 3] },
+    { word: 'FIG', a: [2, 0], b: [4, 0] },
+    { word: 'MINT', a: [1, 1], b: [1, 4] },
+    { word: 'POOL', a: [2, 2], b: [5, 2] },
+  ];
+  return function create(ctx) {
+    const root = el('div', 'pz');
+    const list = el('ul', 'words');
+    const grid = el('div', 'wgrid');
+    root.append(list, grid);
+    const inst = { root, done: false };
+    WORDS.forEach((w) => { w.found = false; w.li = el('li', null, w.word); list.append(w.li); });
+
+    const cells = GRID.map((row, r) => row.split('').map((ch, c) => {
+      const b = button(ch, 'cell', () => tap(r, c));
+      b.setAttribute('aria-label', 'Letter ' + ch + ', row ' + (r + 1) + ', column ' + (c + 1));
+      grid.append(b);
+      return b;
+    }));
+    let sel = null;
+    const same = (p, q) => p[0] === q[0] && p[1] === q[1];
+
+    function cellsBetween(a, b) {
+      const dr = Math.sign(b[0] - a[0]), dc = Math.sign(b[1] - a[1]);
+      const len = Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])) + 1;
+      return Array.from({ length: len }, (_, i) => cells[a[0] + dr * i][a[1] + dc * i]);
+    }
+    function markFound(w) {
+      w.found = true;
+      w.li.classList.add('found');
+      const k = WORDS.indexOf(w);
+      cellsBetween(w.a, w.b).forEach((b) => b.classList.add('f' + k));
+      cells.flat().forEach((b) => b.classList.remove('pulse'));
+      if (WORDS.every((x) => x.found)) {
+        inst.done = true;
+        ctx.solved();
+      } else {
+        ctx.say('You found ' + w.word + '!', 'good');
+      }
+    }
+    function tap(r, c) {
+      if (inst.done) return;
+      const p = [r, c];
+      if (!sel) {
+        sel = p;
+        cells[r][c].classList.add('sel');
+        ctx.say('Now tap the last letter of the word.', 'good');
+        return;
+      }
+      cells[sel[0]][sel[1]].classList.remove('sel');
+      if (same(sel, p)) { sel = null; ctx.say(''); return; }
+      const w = WORDS.find((x) => !x.found && ((same(x.a, sel) && same(x.b, p)) || (same(x.b, sel) && same(x.a, p))));
+      sel = null;
+      if (w) markFound(w);
+      else ctx.say('Those letters don’t make one of the words. Try again.');
+    }
+    const firstMissing = () => WORDS.find((w) => !w.found);
+    inst.hints = [
+      { text: 'The words read across from left to right, or straight down.' },
+      {
+        text: 'Look for the glowing letter: a word starts there.',
+        act: () => { const w = firstMissing(); if (w) cells[w.a[0]][w.a[1]].classList.add('pulse'); },
+      },
+      {
+        text: 'I have found one word for you.',
+        act: () => { const w = firstMissing(); if (w) markFound(w); },
+      },
+    ];
+    inst.solve = () => { WORDS.filter((w) => !w.found).forEach(markFound); };
+    return inst;
+  };
+}
+
+/* =========================================================================
+   The five places, their people and their puzzles
+   ========================================================================= */
+const STATIONS = [
+  {
+    name: 'The City Gate',
+    person: { name: 'Hasan', role: 'the gatekeeper' },
+    cam: [0, 1.6, 9.5], look: [1.5, 1.25, 3.2],
+    ask: '“Welcome to Isfahan, traveller! The lamplighter left the first lantern with me. Answer my riddle and I will light it.”',
+    success: '“A map, of course!” Hasan laughs. “On you go, into the bazaar.”',
+    create: choicePuzzle({
+      riddle: 'I have cities, but no houses.\nI have forests, but no trees.\nI have rivers, but no water.\nWhat am I?',
+      choices: ['A mirror', 'A map', 'A cloud', 'A song'],
+      answer: 'A map',
+      wrong: 'Hasan shakes his head kindly. “Not that one. Try again.”',
+      hints: [
+        'Think of something a traveller carries to find the way.',
+        'It is drawn on paper and shows roads, rivers and towns.',
+        'I have taken away two of the wrong answers.',
+      ],
+    }),
+  },
+  {
+    name: 'The Spice Bazaar',
+    person: { name: 'Maryam', role: 'the spice merchant' },
+    cam: [1.0, 1.6, -11.2], look: [-3.6, 1.2, -16],
+    ask: '“The label has fallen off my finest spice! It is made from red threads picked from purple crocus flowers, and a pinch turns rice golden.\n\nTap the letters to spell its name.”',
+    success: '“Saffron! Worth more than its weight in silver,” says Maryam.',
+    create: spellPuzzle({
+      answer: 'SAFFRON',
+      hints: [
+        'It has two F’s, side by side.',
+        'The first letter is S. I have put it in place for you.',
+        'I have filled in most of the word. Only the last two letters are left.',
+      ],
+    }),
+  },
+  {
+    name: 'The Tile Workshop',
+    person: { name: 'Reza', role: 'the tile maker' },
+    cam: [0, 1.6, -29.8], look: [4.2, 1.7, -33.4],
+    ask: '“The wind has spun my mosaic tiles!” Tap a tile to turn it, until the pattern is whole again. The middle tile is already right.',
+    success: 'The star is whole again. Reza bows: “You have a craftsman’s eye.”',
+    create: mosaicPuzzle(),
+  },
+  {
+    name: 'The Caravanserai',
+    person: { name: 'Farhad', role: 'the old traveller' },
+    cam: [0.6, 1.6, -46.5], look: [-2.2, 1.2, -51],
+    ask: '“Forty years I have crossed the deserts with my camel. Answer my riddle!” Tap the letters to spell the answer. Some letters are spare.',
+    success: '“A towel! Every traveller needs one after the bath house,” chuckles Farhad.',
+    create: spellPuzzle({
+      riddle: 'What gets wetter,\nthe more it dries?',
+      answer: 'TOWEL',
+      extra: 'RAS',
+      hints: [
+        'You would use one after a visit to the hammam, the bath house.',
+        'It begins with T. I have put it in place for you.',
+        'Only the last two letters are left.',
+      ],
+    }),
+  },
+  {
+    name: 'The Palace Garden',
+    person: { name: 'Shirin', role: 'the gardener' },
+    cam: [0, 1.6, -70.5], look: [2.4, 1.3, -74.5],
+    ask: '“Four garden words are hidden in my tiles.” Tap the first letter of a word, then its last letter.',
+    success: '“You found them all!” says Shirin. “Now look up at the palace…”',
+    create: wordSearchPuzzle(),
+  },
+];
+const FINALE = { cam: [0, 1.8, -72.5], look: [0, 6.2, -99] };
+
+/* =========================================================================
+   The 3D city (Three.js). If 3D isn't available the puzzles still work.
+   ========================================================================= */
+const canvas = $('#scene');
+let has3D = !!window.THREE;
+let renderer, scene, camera;
+const world = { people: [], lanterns: [], great: null, marker: null, mosaicMat: null, fireflies: null };
+
+if (has3D) {
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  } catch (e) { has3D = false; }
+}
+if (!has3D) { document.body.classList.add('no3d'); canvas.hidden = true; }
+
+// Paint a texture on a canvas, then keep it as an image: phones can wipe hidden
+// canvases when the app is switched away, which would turn the texture black.
+function paintTex(w, h, draw, rx, ry) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const img = new Image();
+  const t = new THREE.Texture(img);
+  img.onload = () => { t.needsUpdate = true; };
+  img.src = c.toDataURL();
+  if (rx) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); }
+  return t;
+}
+
+function buildWorld() {
+  scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0xa9727a, 50, 300);
+  camera = new THREE.PerspectiveCamera(62, 1, 0.1, 900);
+  camera.rotation.order = 'YXZ';
+
+  scene.add(new THREE.HemisphereLight(0xffd9b8, 0x3a2f4a, 0.95));
+  const sun = new THREE.DirectionalLight(0xffb070, 0.85);
+  sun.position.set(-40, 30, 30);
+  scene.add(sun);
+
+  const lam = (c, extra) => new THREE.MeshLambertMaterial(Object.assign({ color: c }, extra || {}));
+  const M = {
+    sand: lam(0xc9a77a), path: lam(0xb39673), grass: lam(0x45603a), gravel: lam(0xcdb994),
+    stone: lam(0xd6c3a0), wall: lam(0xd2b07f), wallTrim: lam(0xb38f62),
+    door: lam(0x2a1b16), window: lam(0x3a2a33), wood: lam(0x6b4428), gold: lam(0xd9a520),
+    leaf: lam(0x4f6b35), palm: lam(0x5d7a3a), cypress: lam(0x2c4a2e), trunk: lam(0x7a5a3a),
+    water: lam(0x3f86a3, { emissive: 0x0d2a3a }), skin: lam(0xc68d63), skinDark: lam(0x9c6b48),
+    camel: lam(0xc69c6d), plaster: lam(0xe3cfa8), dark: lam(0x1a1210),
+  };
+  const houseColours = [0xd9bb8c, 0xcf9f62, 0xc4865a, 0xe3cfa8, 0xd8b07a];
+  const houseMats = houseColours.map((c) => lam(c));
+
+  // Textures
+  const tileTex = (rx, ry) => paintTex(128, 128, (g, w) => {
+    g.fillStyle = '#2b9c98'; g.fillRect(0, 0, w, w);
+    const diamond = (r) => { g.beginPath(); g.moveTo(64, 64 - r); g.lineTo(64 + r, 64); g.lineTo(64, 64 + r); g.lineTo(64 - r, 64); g.closePath(); };
+    g.fillStyle = '#1d4f8c'; diamond(58); g.fill();
+    g.strokeStyle = '#e9f3ee'; g.lineWidth = 3; diamond(46); g.stroke();
+    g.fillStyle = '#2b9c98'; diamond(36); g.fill();
+    g.fillStyle = '#f1c24a';
+    for (const [x, y] of [[64, 64], [0, 0], [128, 0], [0, 128], [128, 128]]) { g.beginPath(); g.arc(x, y, 9, 0, 7); g.fill(); }
+  }, rx, ry);
+  const domeMat = lam(0xffffff, { map: tileTex(10, 4) });
+  const panelTileMat = lam(0xffffff, { map: tileTex(0.7, 0.7) });
+  const paveTex = paintTex(128, 128, (g, w) => {
+    const r = seeded(3);
+    g.fillStyle = '#7d6b55'; g.fillRect(0, 0, w, w);
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+      const v = 165 + Math.floor(r() * 30);
+      g.fillStyle = 'rgb(' + v + ',' + (v - 22) + ',' + (v - 50) + ')';
+      g.fillRect(x * 32 + 2, y * 32 + 2, 28, 28);
+    }
+  }, 3, 20);
+  const stripes = (a, b) => paintTex(64, 64, (g) => {
+    for (let i = 0; i < 8; i++) { g.fillStyle = i % 2 ? b : a; g.fillRect(i * 8, 0, 8, 64); }
+    g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 56, 64, 8);
+  });
+  // Awnings are unlit so their stripes show from below as well as above
+  const awning = (a, b) => new THREE.MeshBasicMaterial({ color: 0xd8c4b0, map: stripes(a, b), side: THREE.DoubleSide });
+  const awningMats = [awning('#b33a2e', '#efe0c0'), awning('#1f4f8f', '#efe0c0'), awning('#2b9c98', '#f1d79a')];
+  const glowTex = paintTex(64, 64, (g) => {
+    const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,240,200,1)'); gr.addColorStop(0.25, 'rgba(255,180,70,.8)'); gr.addColorStop(1, 'rgba(255,140,40,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  });
+  const glowMat = () => new THREE.SpriteMaterial({ map: glowTex, color: 0xffb347, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
+
+  // Building blocks
+  function mesh(geo, mat, x, y, z, parent) {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(x || 0, y || 0, z || 0);
+    (parent || scene).add(m);
+    return m;
+  }
+  function boxAt(w, h, d, mat, x, y, z, parent) { return mesh(new THREE.BoxGeometry(w, h, d), mat, x, y + h / 2, z, parent); }
+  function group(x, z, rotY) {
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    g.rotation.y = rotY || 0;
+    scene.add(g);
+    return g;
+  }
+
+  // A pointed Persian arch: points from the left foot of the curve, over the top, to the right.
+  function archPoints(r, sh, n) {
+    n = n || 8;
+    const c = 0.32 * r, R = r + c, a0 = Math.acos(-c / R);
+    const left = [];
+    for (let i = 0; i <= n; i++) {
+      const a = Math.PI - (Math.PI - a0) * i / n;
+      left.push(new THREE.Vector2(c + R * Math.cos(a), sh + R * Math.sin(a)));
+    }
+    const right = left.slice(0, n).reverse().map((p) => new THREE.Vector2(-p.x, p.y));
+    return left.concat(right);
+  }
+  // A wall w wide and h high with an arched opening (radius r, sides sh high) through the middle.
+  function archWallShape(w, h, r, sh) {
+    const s = new THREE.Shape();
+    s.moveTo(-w / 2, 0); s.lineTo(-r, 0);
+    archPoints(r, sh).forEach((p) => s.lineTo(p.x, p.y));
+    s.lineTo(r, 0); s.lineTo(w / 2, 0); s.lineTo(w / 2, h); s.lineTo(-w / 2, h); s.lineTo(-w / 2, 0);
+    return s;
+  }
+  function archWall(w, h, r, sh, depth, mat, parent, x, z) {
+    const geo = new THREE.ExtrudeGeometry(archWallShape(w, h, r, sh), { depth, bevelEnabled: false });
+    geo.translate(0, 0, -depth / 2);
+    return mesh(geo, mat, x, 0, z, parent);
+  }
+  // A tiled frame on the face of an arched wall
+  function archFrame(w, h, r, sh, parent, x, y, z) {
+    return mesh(new THREE.ShapeGeometry(archWallShape(w, h, r, sh)), panelTileMat, x, y, z, parent);
+  }
+  const archFillCache = {};
+  function archFill(r, sh) {
+    const key = r + ':' + sh;
+    if (!archFillCache[key]) {
+      const s = new THREE.Shape();
+      s.moveTo(-r, 0);
+      archPoints(r, sh, 6).forEach((p) => s.lineTo(p.x, p.y));
+      s.lineTo(r, 0); s.lineTo(-r, 0);
+      archFillCache[key] = new THREE.ShapeGeometry(s);
+    }
+    return archFillCache[key];
+  }
+  function dome(parent, x, y, z, r) {
+    mesh(new THREE.CylinderGeometry(r * 0.92, r * 0.92, r * 0.5, 16), M.plaster, x, y + r * 0.25, z, parent);
+    mesh(new THREE.SphereGeometry(r, 18, 9, 0, Math.PI * 2, 0, Math.PI / 2), domeMat, x, y + r * 0.5, z, parent);
+    mesh(new THREE.ConeGeometry(r * 0.08, r * 0.5, 6), M.gold, x, y + r * 1.75, z, parent);
+  }
+  // A flat-roofed house; its front faces the local +z direction.
+  function house(x, z, rotY, w, d, h, opts) {
+    opts = opts || {};
+    const g = group(x, z, rotY);
+    const mat = opts.mat || houseMats[Math.floor(rand() * houseMats.length)];
+    boxAt(w, h, d, mat, 0, 0, -d / 2, g);
+    boxAt(w + 0.1, 0.4, 0.22, M.wallTrim, 0, h, -0.11, g);
+    boxAt(w + 0.1, 0.4, 0.22, M.wallTrim, 0, h, -d + 0.11, g);
+    if (!opts.noDoor) mesh(archFill(0.6, 1.3), M.door, opts.doorX || 0, 0, 0.02, g);
+    if (h > 4) for (const s of [-1, 1]) mesh(archFill(0.32, 0.5), M.window, s * w * 0.3, h * 0.58, 0.02, g);
+    if (opts.dome) dome(g, 0, h, -d / 2, Math.min(w, d) * 0.36);
+    return g;
+  }
+  const rand = seeded(11);
+
+  // Sky, sun and stars
+  const skyTex = paintTex(4, 256, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, '#0f1233'); gr.addColorStop(0.3, '#2b2a5c'); gr.addColorStop(0.43, '#7a4c78');
+    gr.addColorStop(0.49, '#e58a52'); gr.addColorStop(0.52, '#f2b36b'); gr.addColorStop(0.58, '#6a4a5a'); gr.addColorStop(1, '#2a2030');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  });
+  mesh(new THREE.SphereGeometry(500, 24, 16), new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false }));
+  const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffc070, fog: false, transparent: true, depthWrite: false }));
+  sunGlow.position.set(-300, 14, -260); sunGlow.scale.set(160, 160, 1);
+  scene.add(sunGlow);
+  {
+    const pts = [];
+    const r = seeded(5);
+    for (let i = 0; i < 350; i++) {
+      const a = r() * Math.PI * 2, e = 0.35 + r() * 1.1;
+      pts.push(Math.cos(a) * Math.cos(e) * 450, Math.sin(e) * 450, Math.sin(a) * Math.cos(e) * 450);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xfff4d8, size: 1.6, sizeAttenuation: false, fog: false })));
+  }
+  // Far mountains
+  {
+    const mat = lam(0x6a5072);
+    const r = seeded(9);
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2 + r() * 0.2, d = 230 + r() * 60, h = 25 + r() * 40;
+      const m = mesh(new THREE.ConeGeometry(30 + r() * 30, h, 5), mat, Math.cos(a) * d, h / 2 - 2, Math.sin(a) * d - 40);
+      m.rotation.y = r() * 3;
+    }
+  }
+
+  // Ground
+  const ground = mesh(new THREE.PlaneGeometry(900, 900), M.sand);
+  ground.rotation.x = -Math.PI / 2;
+  const flat = (w, d, mat, x, y, z) => { const m = mesh(new THREE.PlaneGeometry(w, d), mat, x, y, z); m.rotation.x = -Math.PI / 2; return m; };
+  flat(4, 22, M.path, 0, 0.015, 11);                                    // track up to the gate
+  flat(9.2, 44, lam(0xffffff, { map: paveTex }), 0, 0.02, -20);          // the street
+  flat(26, 22, M.stone, 0, 0.02, -53);                                  // caravanserai courtyard
+  flat(60, 40, M.grass, 0, 0.02, -84);                                  // palace garden
+  flat(9, 40, M.gravel, 0, 0.03, -84);                                  // garden walk
+
+  /* ---- City wall and gate (z = 0) ---- */
+  archWall(10, 8, 2, 3.6, 3, M.wall, null, 0, 0);
+  archFrame(7, 7.2, 2.25, 3.6, null, 0, 0, 1.52);
+  boxAt(7.6, 0.3, 0.3, M.gold, 0, 7.2, 1.55);
+  for (const s of [-1, 1]) {
+    boxAt(56, 6.5, 2.4, M.wall, s * 33, 0, 0);
+    mesh(new THREE.CylinderGeometry(1.9, 2.1, 9.5, 12), M.wall, s * 5.8, 4.75, 0.4);
+    dome(null, s * 5.8, 9.5, 0.4, 1.6);
+  }
+  {
+    // Battlements along the wall, as one instanced mesh
+    const xs = [];
+    for (let x = 8; x < 60; x += 1.6) xs.push(x, -x);
+    const teeth = new THREE.InstancedMesh(new THREE.BoxGeometry(0.8, 0.7, 2.4), M.wall, xs.length);
+    const m = new THREE.Matrix4();
+    xs.forEach((x, i) => { m.makeTranslation(x, 6.85, 0); teeth.setMatrixAt(i, m); });
+    teeth.frustumCulled = false;
+    scene.add(teeth);
+  }
+
+  /* ---- Palms and plants outside the wall ---- */
+  function palm(x, z, h) {
+    const g = group(x, z, rand() * 6);
+    const lean = (rand() - 0.5) * 0.25;
+    const trunk = mesh(new THREE.CylinderGeometry(0.16, 0.26, h, 7), M.trunk, 0, h / 2, 0, g);
+    trunk.rotation.z = lean;
+    const top = new THREE.Vector3(-Math.sin(lean) * h, h * Math.cos(lean), 0);
+    for (let k = 0; k < 7; k++) {
+      const pivot = new THREE.Group();
+      pivot.position.copy(top);
+      pivot.rotation.y = k * Math.PI * 2 / 7;
+      g.add(pivot);
+      const f = mesh(new THREE.ConeGeometry(0.35, 2.4, 4), M.palm, 0, 0, 1.1, pivot);
+      f.rotation.x = Math.PI / 2 + 0.55;
+      f.scale.set(1, 1, 0.2);
+    }
+  }
+  [[-8, 6], [-12, 13], [9, 7], [14, 15], [-20, 20], [21, 9], [-30, 10], [6.5, 22]].forEach(([x, z]) => palm(x, z, 5 + rand() * 3));
+
+  /* ---- Houses along the street ---- */
+  const leftRow = [[-5, 5], [-11, 6], [-17.5, 6.5], [-24.5, 6], [-31, 6], [-37.5, 6.5]];
+  const rightRow = [[-5.5, 6], [-12, 6.5], [-18.8, 6], [-25.5, 6.5], [-39, 5]];
+  leftRow.forEach(([z, w], i) => house(-4.6, z, Math.PI / 2, w - 0.3, 6, 4.5 + rand() * 2.5, { dome: i === 3 }));
+  rightRow.forEach(([z, w], i) => house(4.6, z, -Math.PI / 2, w - 0.3, 6, 4.5 + rand() * 2.5, { dome: i === 1 }));
+  // Skyline behind the street: more houses, domes and two minarets
+  for (let i = 0; i < 34; i++) {
+    const side = i % 2 ? 1 : -1;
+    const x = side * (13 + rand() * 30), z = -4 - rand() * 58;
+    if (Math.abs(x) < 16 && z < -40) continue;
+    house(x, z, side > 0 ? -Math.PI / 2 : Math.PI / 2, 5 + rand() * 4, 6 + rand() * 3, 4 + rand() * 5, { dome: rand() < 0.3, noDoor: true });
+  }
+  function minaret(x, z, h) {
+    mesh(new THREE.CylinderGeometry(0.6, 0.75, h, 12), M.plaster, x, h / 2, z);
+    mesh(new THREE.CylinderGeometry(0.95, 0.75, 0.5, 12), M.wallTrim, x, h * 0.8, z);
+    mesh(new THREE.CylinderGeometry(0.62, 0.62, h * 0.12, 12), domeMat, x, h * 0.9, z);
+    mesh(new THREE.ConeGeometry(0.7, 1.8, 12), domeMat, x, h + 0.9, z);
+  }
+  minaret(-24, -30, 20);
+  minaret(28, -18, 17);
+
+  /* ---- The bazaar: stalls with awnings and heaps of spice ---- */
+  const spiceColours = [0xb5281c, 0xe0a21a, 0x6b8e23, 0x8b4a2b, 0xd2691e, 0xc9b27a];
+  function stall(side, z, awningMat) {
+    const xIn = side * 3.1;
+    boxAt(1.0, 0.9, 3.4, M.wood, xIn, 0, z);
+    for (let k = 0; k < 4; k++) {
+      const c = spiceColours[(k + Math.floor(rand() * 6)) % 6];
+      mesh(new THREE.ConeGeometry(0.24, 0.32, 10), lam(c), xIn, 1.06, z - 1.1 + k * 0.72);
+    }
+    // Sacks in front of the counter
+    for (let k = 0; k < 3; k++) {
+      const s = mesh(new THREE.CylinderGeometry(0.22, 0.26, 0.55, 8), lam(0xcfb48a), side * 2.35, 0.28, z - 1 + k * 0.9);
+      mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.04, 8), lam(spiceColours[(k * 2 + 1) % 6]), side * 2.35, 0.57, z - 1 + k * 0.9);
+      s.rotation.y = k;
+    }
+    // Canvas awning: lie it flat, then tilt it down toward the street
+    const aw = mesh(new THREE.PlaneGeometry(2.6, 3.8), awningMat, side * 3.3, 2.65, z);
+    aw.rotation.x = -Math.PI / 2;
+    aw.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), side * 0.7);
+    for (const dz of [-1.8, 1.8]) mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.85, 6), M.wood, side * 2.35, 0.92, z + dz);
+  }
+  stall(-1, -16, awningMats[0]);
+  stall(-1, -21.5, awningMats[2]);
+  stall(1, -12.5, awningMats[1]);
+  stall(1, -19, awningMats[0]);
+
+  /* ---- The tile workshop and its mosaic on the wall ---- */
+  house(4.6, -33.2, -Math.PI / 2, 7.5, 7, 6.5, { mat: M.plaster, doorX: 2.2 });
+  {
+    const turned = paintTex(256, 256, (g) => drawTurnedMosaic(g, 256, MOSAIC_START));
+    const whole = paintTex(256, 256, (g) => drawMosaic(g, 256));
+    world.mosaicMat = lam(0xffffff, { map: turned });
+    world.mosaicTextures = { turned, whole };
+    const frame = boxAt(0.12, 3, 3, M.gold, 4.62, 0.9, -34.3);
+    frame.position.y = 2.4;
+    const panel = mesh(new THREE.PlaneGeometry(2.7, 2.7), world.mosaicMat, 4.54, 2.4, -34.3);
+    panel.rotation.y = -Math.PI / 2;
+    // Reza's table with spare tiles
+    boxAt(1.4, 0.8, 0.8, M.wood, 2.9, 0, -35.6);
+    for (let k = 0; k < 4; k++) boxAt(0.3, 0.05, 0.3, k % 2 ? domeMat : M.gold, 2.5 + k * 0.28, 0.8, -35.6);
+  }
+
+  /* ---- The caravanserai courtyard ---- */
+  for (const s of [-1, 1]) {
+    boxAt(8.4, 6, 1, M.wall, s * 8.8, 0, -42);
+    for (let k = 0; k < 5; k++) {
+      const a = archWall(4, 5.5, 1.2, 2.6, 1.2, M.wall, null, s * 12.6, -44 - k * 4);
+      a.rotation.y = Math.PI / 2;
+    }
+    boxAt(1.2, 5.5, 22, M.wallTrim, s * 14.4, 0, -53);
+  }
+  {
+    // Fountain
+    const fx = -4, fz = -53;
+    mesh(new THREE.CylinderGeometry(1.9, 2, 0.6, 8), M.stone, fx, 0.3, fz);
+    mesh(new THREE.CylinderGeometry(1.65, 1.65, 0.05, 8), M.water, fx, 0.58, fz);
+    mesh(new THREE.CylinderGeometry(0.15, 0.25, 1.3, 8), M.stone, fx, 0.9, fz);
+    mesh(new THREE.CylinderGeometry(0.6, 0.25, 0.2, 8), domeMat, fx, 1.6, fz);
+    // Camel
+    const camel = group(4.6, -55, -0.9);
+    const body = mesh(new THREE.SphereGeometry(0.75, 12, 10), M.camel, 0, 1.6, 0, camel); body.scale.set(0.8, 0.75, 1.5);
+    mesh(new THREE.SphereGeometry(0.45, 10, 8), M.camel, 0, 2.15, -0.1, camel);
+    const neck = mesh(new THREE.CylinderGeometry(0.15, 0.22, 1.1, 8), M.camel, 0, 2.05, 1.15, camel); neck.rotation.x = 0.6;
+    boxAt(0.28, 0.3, 0.6, M.camel, 0, 2.45, 1.55, camel);
+    for (const [x, z] of [[-0.3, 0.75], [0.3, 0.75], [-0.3, -0.75], [0.3, -0.75]]) mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.3, 6), M.camel, x, 0.65, z, camel);
+    mesh(new THREE.BoxGeometry(1.0, 0.12, 0.9), awningMats[1], 0, 2.25, 0.4, camel);
+    // Bundles and crates
+    boxAt(0.8, 0.6, 0.8, M.wood, 6.8, 0, -51.5);
+    boxAt(0.6, 0.5, 0.6, M.wood, 7.2, 0.6, -51.3);
+    mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.9, 8), lam(0x8a5a3a), 6.2, 0.45, -58);
+  }
+
+  /* ---- The palace garden (behind a tiled gate at z = -64) ---- */
+  archWall(8, 7, 1.6, 3.2, 1.6, M.wall, null, 0, -64);
+  archFrame(5.8, 6.3, 1.85, 3.2, null, 0, 0, -63.18);
+  for (const s of [-1, 1]) {
+    boxAt(26, 5, 1.4, M.wall, s * 17, 0, -64);
+    boxAt(1.4, 5, 40, M.wall, s * 30, 0, -84);
+  }
+  // The long pool with its stone rim
+  mesh(new THREE.BoxGeometry(3.2, 0.16, 14), M.water, 0, 0.1, -83);
+  for (const s of [-1, 1]) boxAt(0.3, 0.3, 14.6, M.stone, s * 1.75, 0, -83);
+  boxAt(3.8, 0.3, 0.3, M.stone, 0, 0, -75.85);
+  boxAt(3.8, 0.3, 0.3, M.stone, 0, 0, -90.15);
+  for (let k = 0; k < 5; k++) for (const s of [-1, 1]) {
+    const z = -75 - k * 5;
+    mesh(new THREE.CylinderGeometry(0.12, 0.15, 0.6, 6), M.trunk, s * 3.6, 0.3, z);
+    mesh(new THREE.ConeGeometry(0.6, 5, 7), M.cypress, s * 3.6, 3.0, z);
+    // Rose bushes between the cypresses
+    const bx = s * 6, bz = z - 2.5;
+    mesh(new THREE.IcosahedronGeometry(0.55, 0), M.leaf, bx, 0.45, bz);
+    for (let f = 0; f < 3; f++) mesh(new THREE.SphereGeometry(0.11, 6, 5), lam(0xd9567a), bx + (f - 1) * 0.3, 0.8, bz + (f % 2 ? 0.25 : -0.2));
+    // Fig trees further out
+    mesh(new THREE.CylinderGeometry(0.15, 0.2, 1.6, 6), M.trunk, s * 10, 0.8, z - 1);
+    mesh(new THREE.IcosahedronGeometry(1.5, 0), M.leaf, s * 10, 2.6, z - 1);
+  }
+  // The palace: a great arched porch (iwan), wings, a blue dome and two minarets
+  {
+    const pz = -100;
+    archWall(14, 13, 3.2, 5.5, 4, M.plaster, null, 0, pz);
+    archFrame(10.5, 12, 3.55, 5.5, null, 0, 0, pz + 2.02);
+    boxAt(11, 0.4, 0.4, M.gold, 0, 12, pz + 2.1);
+    boxAt(7.2, 11, 0.6, lam(0x8a6a50), 0, 0, pz - 1.6);
+    mesh(archFill(1.0, 2.0), M.door, 0, 0, pz - 1.28);
+    for (const s of [-1, 1]) {
+      const wing = group(s * 13.5, pz + 2, 0);
+      boxAt(13, 8, 8, M.plaster, 0, 0, -4, wing);
+      boxAt(13.1, 0.4, 0.3, M.wallTrim, 0, 8, -0.15, wing);
+      for (let k = 0; k < 3; k++) for (const y of [0.6, 4.4]) mesh(archFill(0.75, 1.5), M.window, (k - 1) * 3.8, y, 0.02, wing);
+      minaret(s * 7.6, pz + 1.6, 22);
+    }
+    mesh(new THREE.CylinderGeometry(5, 5, 3, 24), M.plaster, 0, 14.5, pz - 6);
+    mesh(new THREE.SphereGeometry(5.2, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), domeMat, 0, 16, pz - 6);
+    mesh(new THREE.ConeGeometry(0.4, 2.2, 8), M.gold, 0, 22, pz - 6);
+  }
+
+  /* ---- People ---- */
+  function person(o) {
+    const g = new THREE.Group();
+    const robe = lam(o.robe);
+    mesh(new THREE.CylinderGeometry(0.2, 0.42, 1.25, 10), robe, 0, 0.625, 0, g);
+    mesh(new THREE.CylinderGeometry(0.215, 0.24, 0.12, 10), lam(o.sash), 0, 0.95, 0, g);
+    mesh(new THREE.SphereGeometry(0.24, 10, 8), robe, 0, 1.2, 0, g).scale.set(1.15, 0.7, 0.85);
+    const skin = o.dark ? M.skinDark : M.skin;
+    mesh(new THREE.SphereGeometry(0.16, 12, 10), skin, 0, 1.45, 0, g);
+    for (const s of [-1, 1]) mesh(new THREE.SphereGeometry(0.022, 6, 5), M.dark, s * 0.055, 1.48, 0.145, g);
+    if (o.turban) mesh(new THREE.SphereGeometry(0.2, 12, 8), lam(o.turban), 0, 1.57, -0.01, g).scale.set(1, 0.72, 1);
+    if (o.scarf) {
+      mesh(new THREE.SphereGeometry(0.19, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), lam(o.scarf), 0, 1.46, -0.03, g);
+      mesh(new THREE.CylinderGeometry(0.17, 0.3, 0.5, 10), lam(o.scarf), 0, 1.24, -0.06, g);
+    }
+    if (o.beard) {
+      const b = mesh(new THREE.ConeGeometry(0.1, 0.22, 8), lam(o.beard), 0, 1.31, 0.11, g);
+      b.rotation.x = Math.PI;
+    }
+    for (const s of [-1, 1]) {
+      const arm = mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.6, 8), robe, s * 0.3, 0.98, 0.05, g);
+      arm.rotation.z = s * 0.18;
+      mesh(new THREE.SphereGeometry(0.07, 8, 6), skin, s * 0.36, 0.67, 0.07, g);
+    }
+    if (o.staff) mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.1, 6), M.wood, 0.42, 1.0, 0.12, g);
+    return g;
+  }
+  const peopleSpec = [
+    { at: [2.0, 3.4], o: { robe: 0x1f4f8f, sash: 0xd9a520, turban: 0xefe6d2, beard: 0x3b2a20, staff: true } },  // Hasan
+    { at: [-4.0, -16.2], o: { robe: 0x8a2f4a, sash: 0xe2a51c, scarf: 0x2b9c98 } },                             // Maryam
+    { at: [3.6, -32.4], o: { robe: 0x3f6a4a, sash: 0xc4865a, turban: 0x1f4f8f, beard: 0x2a1d16, dark: true } }, // Reza
+    { at: [-1.8, -50.8], o: { robe: 0x8a6a40, sash: 0x5a2a20, turban: 0xb33a2e, beard: 0xd8d0c4, staff: true } }, // Farhad
+    { at: [2.6, -74.4], o: { robe: 0x5a7a3a, sash: 0xd9567a, scarf: 0xb8456a } },                              // Shirin
+  ];
+  peopleSpec.forEach((p, i) => {
+    const g = person(p.o);
+    g.position.set(p.at[0], 0, p.at[1]);
+    const cam = STATIONS[i].cam;
+    g.rotation.y = Math.atan2(cam[0] - p.at[0], cam[2] - p.at[1]);
+    g.userData.station = i;
+    g.userData.baseYaw = g.rotation.y;
+    scene.add(g);
+    world.people.push(g);
+  });
+
+  /* ---- Lanterns: one on a post at each place, and the great lantern of the palace ---- */
+  function lantern(x, y, z, size, parent) {
+    const mat = lam(0x5a4030);
+    const body = mesh(new THREE.CylinderGeometry(0.15 * size, 0.11 * size, 0.36 * size, 6), mat, x, y, z, parent);
+    mesh(new THREE.ConeGeometry(0.18 * size, 0.2 * size, 6), M.gold, x, y + 0.28 * size, z, parent);
+    mesh(new THREE.CylinderGeometry(0.1 * size, 0.06 * size, 0.06 * size, 6), M.gold, x, y - 0.21 * size, z, parent);
+    const glow = new THREE.Sprite(glowMat());
+    glow.position.set(x, y, z);
+    glow.scale.set(2.4 * size, 2.4 * size, 1);
+    glow.visible = false;
+    (parent || scene).add(glow);
+    // Lights are made now with no brightness, so lighting one later doesn't stall the phone.
+    const light = new THREE.PointLight(0xffa64d, 0, 9 * size, 2);
+    light.position.set(x, y, z);
+    scene.add(light);
+    return { mat, glow, light, body, size };
+  }
+  const lanternSpots = [[-2.6, 3.6], [-1.9, -18.2], [1.9, -35.0], [-1.2, -53.4], [1.1, -76.2]];
+  lanternSpots.forEach(([x, z]) => {
+    mesh(new THREE.CylinderGeometry(0.05, 0.07, 2.35, 6), M.wood, x, 1.18, z);
+    boxAt(0.08, 0.08, 0.08, M.gold, x, 2.33, z);
+    world.lanterns.push(lantern(x, 2.6, z, 1));
+  });
+  mesh(new THREE.CylinderGeometry(0.03, 0.03, 4.2, 4), M.gold, 0, 9.4, -99.2);
+  world.great = lantern(0, 6.6, -99.2, 3);
+
+  // Gold marker floating above the person you can talk to
+  // Drawn on top of everything, so an awning or a post never hides it
+  world.marker = mesh(new THREE.OctahedronGeometry(0.16), new THREE.MeshBasicMaterial({ color: 0xffcf4a, fog: false, depthTest: false }));
+  world.marker.renderOrder = 10;
+
+  // Fireflies in the garden for the ending
+  {
+    const pts = [];
+    const r = seeded(21);
+    for (let i = 0; i < 70; i++) pts.push((r() - 0.5) * 22, 0.5 + r() * 3, -72 - r() * 26);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    world.fireflies = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffd36b, size: 0.12, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    world.fireflies.visible = false;
+    world.fireflyBase = pts.slice();
+    scene.add(world.fireflies);
+  }
+}
+
+function setLantern(l, on) {
+  if (!l) return;
+  l.mat.color.setHex(on ? 0xffd27a : 0x5a4030);
+  l.mat.emissive.setHex(on ? 0xffa53a : 0x000000);
+  l.glow.visible = on;
+  l.light.intensity = on ? (l.size > 1 ? 2.2 : 1.4) : 0;
+}
+function setMosaicWall(whole) {
+  if (!world.mosaicMat) return;
+  world.mosaicMat.map = whole ? world.mosaicTextures.whole : world.mosaicTextures.turned;
+  world.mosaicMat.needsUpdate = true;
+}
+
+/* =========================================================================
+   Camera: stand at a place, glide between places, drag to look around
+   ========================================================================= */
+const view = { x: 0, y: 1.6, z: 9.5, yaw: 0, pitch: 0 };
+const look = { yaw: 0, pitch: 0, lastDrag: 0 };
+let glide = null;
+
+function poseOf(st) {
+  const dx = st.look[0] - st.cam[0], dy = st.look[1] - st.cam[1], dz = st.look[2] - st.cam[2];
+  return { x: st.cam[0], y: st.cam[1], z: st.cam[2], yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)) };
+}
+function setPose(p) { Object.assign(view, { x: p.x, y: p.y, z: p.z, yaw: p.yaw, pitch: p.pitch }); look.yaw = 0; look.pitch = 0; }
+function angleLerp(a, b, u) {
+  let d = b - a;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return a + d * u;
+}
+// Walk smoothly to a new pose: turn to face the way, walk, then turn to face the person.
+function glideTo(to, done) {
+  if (!has3D) { setPose(to); done(); return; }
+  const from = { x: view.x, y: view.y, z: view.z, yaw: view.yaw + look.yaw, pitch: view.pitch + look.pitch };
+  look.yaw = 0; look.pitch = 0;
+  const dist = Math.hypot(to.x - from.x, to.z - from.z);
+  glide = {
+    from, to, done, t: 0,
+    dur: clamp(dist / 5.5, 2.5, 6.5),
+    walkYaw: dist > 3 ? Math.atan2(-(to.x - from.x), -(to.z - from.z)) : null,
+  };
+}
+function updateGlide(dt) {
+  const g = glide;
+  g.t += dt;
+  const u = clamp(g.t / g.dur, 0, 1);
+  const e = ease(u);
+  view.x = g.from.x + (g.to.x - g.from.x) * e;
+  view.z = g.from.z + (g.to.z - g.from.z) * e;
+  view.y = g.from.y + (g.to.y - g.from.y) * e + Math.sin(g.t * 9) * 0.03 * Math.sin(Math.PI * u);
+  if (g.walkYaw === null) {
+    view.yaw = angleLerp(g.from.yaw, g.to.yaw, e);
+    view.pitch = g.from.pitch + (g.to.pitch - g.from.pitch) * e;
+  } else if (u < 0.2) {
+    const k = ease(u / 0.2);
+    view.yaw = angleLerp(g.from.yaw, g.walkYaw, k);
+    view.pitch = g.from.pitch * (1 - k);
+  } else if (u < 0.75) {
+    view.yaw = g.walkYaw; view.pitch = 0;
+  } else {
+    const k = ease((u - 0.75) / 0.25);
+    view.yaw = angleLerp(g.walkYaw, g.to.yaw, k);
+    view.pitch = g.to.pitch * k;
+  }
+  if (u >= 1) { glide = null; g.done(); }
+}
+
+// Dragging looks around; a short tap on a person talks to them.
+const pointer = { down: false, x: 0, y: 0, moved: false };
+canvas.addEventListener('pointerdown', (e) => {
+  pointer.down = true; pointer.x = e.clientX; pointer.y = e.clientY; pointer.moved = false;
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!pointer.down) return;
+  const dx = e.clientX - pointer.x, dy = e.clientY - pointer.y;
+  if (!pointer.moved && Math.hypot(dx, dy) < 8) return;
+  pointer.moved = true;
+  pointer.x = e.clientX; pointer.y = e.clientY;
+  if (glide || (game.mode !== 'explore' && game.mode !== 'ended')) return;
+  look.yaw = clamp(look.yaw + dx * 0.005, -1.4, 1.4);
+  look.pitch = clamp(look.pitch + dy * 0.004, -0.5, 0.6);
+  look.lastDrag = performance.now();
+});
+canvas.addEventListener('pointerup', (e) => {
+  if (pointer.down && !pointer.moved) tapScene(e.clientX, e.clientY);
+  pointer.down = false;
+});
+canvas.addEventListener('pointercancel', () => { pointer.down = false; });
+
+function tapScene(cx, cy) {
+  if (!has3D || glide || game.mode !== 'explore') return;
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera({ x: (cx / innerWidth) * 2 - 1, y: -(cy / innerHeight) * 2 + 1 }, camera);
+  const hit = ray.intersectObjects(world.people, true)[0];
+  if (!hit) return;
+  let o = hit.object;
+  while (o && o.userData.station === undefined) o = o.parent;
+  if (o && o.userData.station === game.at && !game.solved[game.at]) openPuzzle(game.at);
+}
+
+/* =========================================================================
+   Screen furniture: lantern pips, place names, buttons, the panel
+   ========================================================================= */
+const pipsEl = $('#pips'), placeEl = $('#place'), actionsEl = $('#actions'), panelEl = $('#panel');
+for (let i = 0; i < 5; i++) pipsEl.append(el('span', 'pip'));
+
+function updatePips() {
+  [...pipsEl.children].forEach((p, i) => p.classList.toggle('lit', game.solved[i]));
+  pipsEl.setAttribute('aria-label', game.solved.filter(Boolean).length + ' of 5 lanterns lit');
+}
+let placeTimer = 0;
+function showPlace(title, sub) {
+  placeEl.replaceChildren(document.createTextNode(title));
+  if (sub) placeEl.append(el('small', null, sub));
+  placeEl.classList.remove('fade');
+  clearTimeout(placeTimer);
+  placeTimer = setTimeout(() => placeEl.classList.add('fade'), 5000);
+}
+function hidePlace() { clearTimeout(placeTimer); placeEl.classList.add('fade'); }
+
+function openPanel(nodes) {
+  panelEl.replaceChildren(...nodes);
+  panelEl.hidden = false;
+  panelEl.scrollTop = 0;
+  actionsEl.hidden = true;
+  hidePlace();
+}
+function closePanel() { panelEl.hidden = true; }
+
+function refreshActions() {
+  actionsEl.replaceChildren();
+  updatePips();
+  const i = game.at;
+  const talkable = game.mode === 'explore' && !game.solved[i];
+  if (world.marker) world.marker.visible = talkable;
+  if (game.mode !== 'explore' && game.mode !== 'ended') { actionsEl.hidden = true; return; }
+  actionsEl.hidden = false;
+  if (game.mode === 'ended') {
+    actionsEl.append(button('Play again', 'btn ghost', () => { resetGame(); startPlaying(); }));
+  } else if (!game.solved[i]) {
+    actionsEl.append(button('Talk to ' + STATIONS[i].person.name, 'btn', () => openPuzzle(i)));
+  } else if (i < STATIONS.length - 1) {
+    actionsEl.append(button('Walk to ' + STATIONS[i + 1].name, 'btn', () => walkTo(i + 1)));
+  } else {
+    actionsEl.append(button('Light the great lantern', 'btn gold', finale));
+  }
+}
+
+/* =========================================================================
+   Puzzles in the panel
+   ========================================================================= */
+let puzzles = [];
+
+function openPuzzle(i) {
+  game.mode = 'puzzle';
+  refreshActions();
+  if (!puzzles[i]) puzzles[i] = makePuzzleView(i);
+  openPanel([puzzles[i].view]);
+}
+
+function makePuzzleView(i) {
+  const st = STATIONS[i];
+  const feedback = el('p', 'feedback');
+  feedback.setAttribute('aria-live', 'polite');
+  const say = (text, tone) => { feedback.textContent = text || ''; feedback.className = 'feedback ' + (tone || ''); };
+  const inst = st.create({ say, solved: () => onSolved(i) });
+  inst.hintsUsed = 0;
+  const view = el('div', 'pview');
+  view.style.cssText = 'display:flex;flex-direction:column;gap:14px';
+  const hintBox = el('div', 'hint-box');
+  hintBox.hidden = true;
+  const foot = el('div', 'foot');
+  const hintBtn = button('Give me a hint', 'btn gold', () => {
+    if (inst.done) return;
+    if (inst.hintsUsed < inst.hints.length) {
+      const h = inst.hints[inst.hintsUsed++];
+      const p = el('p', null, h.text);
+      hintBox.append(p);
+      if (h.image) hintBox.append(h.image);
+      hintBox.hidden = false;
+      if (h.act) h.act();
+      hintBtn.textContent = inst.hintsUsed < inst.hints.length ? 'Another hint' : 'Solve it for me';
+      p.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    } else {
+      inst.solve();
+    }
+  });
+  const back = button('Step back', 'btn ghost', () => { closePanel(); game.mode = 'explore'; refreshActions(); });
+  foot.append(hintBtn, back);
+  view.append(el('p', 'eyebrow', st.name), el('h2', null, st.person.name + ', ' + st.person.role), el('p', 'say', st.ask), inst.root, feedback, hintBox, foot);
+  inst.view = view;
+  inst.say = say;
+  inst.foot = foot;
+  return inst;
+}
+
+function onSolved(i) {
+  const inst = puzzles[i];
+  inst.done = true;
+  game.solved[i] = true;
+  writeSave();
+  setTimeout(() => {
+    inst.say(STATIONS[i].success, 'good');
+    inst.foot.replaceChildren(button('Light the lantern', 'btn gold', () => {
+      closePanel();
+      game.mode = 'explore';
+      setLantern(world.lanterns[i], true);
+      if (i === 2) setMosaicWall(true);
+      chime(false);
+      refreshActions();
+      const left = game.solved.filter((s) => !s).length;
+      showPlace('Lantern ' + (i + 1) + ' is lit', left ? left + (left === 1 ? ' lantern' : ' lanterns') + ' still to light' : 'Every lantern is lit');
+    }));
+    inst.foot.firstChild.focus();
+    inst.view.lastChild.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, 700);
+}
+
+/* =========================================================================
+   Moving around, the ending, starting and restarting
+   ========================================================================= */
+function walkTo(j) {
+  game.mode = 'walking';
+  refreshActions();
+  hidePlace();
+  glideTo(poseOf(STATIONS[j]), () => {
+    game.at = j;
+    game.mode = 'explore';
+    writeSave();
+    refreshActions();
+    showPlace(STATIONS[j].name, STATIONS[j].person.name + ', ' + STATIONS[j].person.role + ', is waiting to talk to you.');
+  });
+}
+
+function finale() {
+  game.mode = 'walking';
+  refreshActions();
+  glideTo(poseOf(FINALE), () => {
+    setLantern(world.great, true);
+    if (world.fireflies) world.fireflies.visible = true;
+    chime(true);
+    game.finished = true;
+    writeSave();
+    setTimeout(showEnding, 1200);
+  });
+}
+
+function showEnding() {
+  game.mode = 'ending';
+  const story = el('div', 'story');
+  story.append(
+    el('p', 'eyebrow', 'The Palace Garden'),
+    el('h2', null, 'The great lantern shines'),
+    el('p', null, 'You solved all five puzzles, and every lantern in Isfahan is lit. Hasan, Maryam, Reza, Farhad and Shirin gather in the garden to thank you.'),
+    el('p', null, 'This is the end of the first part of the adventure.'),
+  );
+  const foot = el('div', 'foot');
+  foot.append(
+    button('Look around', 'btn', () => { closePanel(); game.mode = 'ended'; refreshActions(); }),
+    button('Play again', 'btn ghost', () => { closePanel(); resetGame(); startPlaying(); }),
+  );
+  openPanel([story, foot]);
+}
+
+function applyWorldState() {
+  world.lanterns.forEach((l, i) => setLantern(l, game.solved[i]));
+  setLantern(world.great, game.finished);
+  if (world.fireflies) world.fireflies.visible = game.finished;
+  setMosaicWall(game.solved[2]);
+}
+
+function resetGame() {
+  game.at = 0;
+  game.solved = [false, false, false, false, false];
+  game.finished = false;
+  puzzles = [];
+  applyWorldState();
+  setPose(poseOf(STATIONS[0]));
+  writeSave();
+}
+
+function showIntro() {
+  game.mode = 'intro';
+  const story = el('div', 'story');
+  const tips = el('ul', 'tips');
+  tips.append(
+    el('li', null, 'Use the big button at the bottom to talk to people and to walk on.'),
+    el('li', null, 'Drag a finger across the picture to look around.'),
+    el('li', null, 'Stuck? Every puzzle has hints, and there is no rush.'),
+  );
+  story.append(
+    el('p', 'eyebrow', 'Isfahan, 1150'),
+    el('h2', null, 'A dark night in the city'),
+    el('p', null, 'The old lamplighter is unwell, and tonight the lanterns of Isfahan are dark. He has trusted five friends across the city with a lantern each.'),
+    el('p', null, 'Solve each friend’s puzzle and they will light their lantern. Light all five, and the great lantern of the palace garden will shine again.'),
+    tips,
+  );
+  const go = button('Let’s begin', 'btn gold', () => { closePanel(); startPlaying(); });
+  openPanel([story, go]);
+  go.focus();
+}
+
+function startPlaying() {
+  game.mode = game.finished ? 'ended' : 'explore';
+  refreshActions();
+  const st = STATIONS[game.at];
+  if (!game.finished) showPlace(st.name, game.solved[game.at] ? 'Walk on when you are ready.' : st.person.name + ', ' + st.person.role + ', is waiting to talk to you.');
+}
+
+function showCover() {
+  const box = $('#coverBtns');
+  const saved = loadSave();
+  const started = saved && (saved.at > 0 || saved.solved.some(Boolean));
+  box.replaceChildren();
+  if (started) {
+    box.append(button('Carry on (' + saved.solved.filter(Boolean).length + ' of 5 lanterns lit)', 'btn gold', () => { $('#cover').hidden = true; chimeUnlock(); startPlaying(); }));
+    box.append(button('Start again', 'btn ghost', () => { $('#cover').hidden = true; chimeUnlock(); resetGame(); showIntro(); }));
+  } else {
+    box.append(button('Begin', 'btn gold', () => { $('#cover').hidden = true; chimeUnlock(); showIntro(); }));
+  }
+  box.firstChild.focus();
+}
+// Phones only allow sound after a tap, so wake the audio on the first button press.
+function chimeUnlock() {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+  } catch (e) { /* no audio */ }
+}
+
+/* Settings: text size and sound */
+function applySettings() {
+  document.documentElement.classList.toggle('big', game.big);
+  $('#textBtn').textContent = game.big ? 'A−' : 'A+';
+  $('#soundBtn').textContent = game.sound ? 'Sound on' : 'Sound off';
+  $('#soundBtn').setAttribute('aria-pressed', String(game.sound));
+}
+$('#textBtn').addEventListener('click', () => { game.big = !game.big; applySettings(); writeSave(); });
+$('#soundBtn').addEventListener('click', () => { game.sound = !game.sound; applySettings(); writeSave(); if (game.sound) chime(false); });
+
+/* =========================================================================
+   Start up and the frame loop
+   ========================================================================= */
+function resize() {
+  if (!has3D) return;
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.fov = w < h ? 72 : 58; // wider view when the phone is upright
+  camera.updateProjectionMatrix();
+}
+
+let clock = 0, lastTime = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+  clock += dt;
+  if (glide) updateGlide(dt);
+  // After a few seconds without dragging, ease the view back to face the person.
+  if (!pointer.down && now - look.lastDrag > 5000) {
+    const k = Math.exp(-dt * 1.5);
+    look.yaw *= k; look.pitch *= k;
+  }
+  // A gentle drift on the title screen
+  const drift = game.mode === 'title' ? Math.sin(clock * 0.25) * 0.12 : 0;
+  camera.position.set(view.x, view.y, view.z);
+  camera.rotation.set(view.pitch + look.pitch, view.yaw + look.yaw + drift, 0);
+
+  world.people.forEach((p, i) => { p.rotation.z = Math.sin(clock * 1.3 + i) * 0.015; });
+  if (world.marker && world.marker.visible) {
+    const p = world.people[game.at].position;
+    world.marker.position.set(p.x, 2.05 + Math.sin(clock * 2.5) * 0.08, p.z);
+    world.marker.rotation.y = clock * 1.8;
+  }
+  world.lanterns.concat([world.great]).forEach((l, i) => {
+    if (l.glow.visible) l.glow.material.opacity = 0.8 + 0.12 * Math.sin(clock * 7 + i * 2) + 0.06 * Math.sin(clock * 13 + i);
+  });
+  if (world.fireflies && world.fireflies.visible) {
+    const pos = world.fireflies.geometry.attributes.position;
+    const base = world.fireflyBase;
+    for (let i = 0; i < pos.count; i++) {
+      pos.setXYZ(i, base[i * 3] + Math.sin(clock * 0.6 + i) * 0.4, base[i * 3 + 1] + Math.sin(clock * 0.9 + i * 1.7) * 0.3, base[i * 3 + 2] + Math.cos(clock * 0.5 + i) * 0.4);
+    }
+    pos.needsUpdate = true;
+  }
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+const saved = loadSave();
+if (saved) {
+  game.at = clamp(saved.at | 0, 0, 4);
+  game.solved = saved.solved.map(Boolean);
+  game.finished = !!saved.finished;
+  game.big = !!saved.big;
+  game.sound = saved.sound !== false;
+}
+applySettings();
+updatePips();
+if (has3D) {
+  try {
+    buildWorld();
+    applyWorldState();
+    setPose(poseOf(STATIONS[game.at]));
+    resize();
+    addEventListener('resize', resize);
+    requestAnimationFrame(frame);
+  } catch (e) {
+    console.error(e);
+    has3D = false;
+    document.body.classList.add('no3d');
+    canvas.hidden = true;
+  }
+}
+showCover();
+})();
+</script>
